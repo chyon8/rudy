@@ -1,6 +1,7 @@
 import { createOpenAiAdapters } from '@rudy/ai';
 import { createDb } from '@rudy/db';
 import {
+  QUEUE_BATCH,
   QUEUE_BRIEF,
   QUEUE_INGEST,
   QUEUE_PUSH,
@@ -12,7 +13,9 @@ import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { runBriefTick } from './brief/scheduler';
 import { ingestMemory, markDegraded } from './ingest/pipeline';
+import { runInterestBatch } from './interest/engine';
 import { processPushJob } from './push/send';
+import { runUserModelWeekly } from './userModel/weekly';
 
 const env = loadEnv();
 const db = createDb(env.DATABASE_URL);
@@ -84,6 +87,28 @@ pushWorker.on('completed', (job) => {
 
 pushWorker.on('failed', (job, err) => {
   console.error(`[worker] push ${job?.id} failed:`, err.message);
+});
+
+// M5 배치 — interest engine 일 1회 새벽(서버 로컬 03:00), user_model 주 1회 스텁 (docs/spec.md §5).
+const batchQueue = new Queue(QUEUE_BATCH, { connection });
+await batchQueue.upsertJobScheduler('interest-daily', { pattern: '0 3 * * *' }, { name: 'interest' });
+await batchQueue.upsertJobScheduler('user-model-weekly', { pattern: '0 4 * * 1' }, { name: 'user_model' });
+
+const batchWorker = new Worker(
+  QUEUE_BATCH,
+  async (job) => {
+    if (job.name === 'interest') await runInterestBatch({ db, llm });
+    else if (job.name === 'user_model') await runUserModelWeekly();
+  },
+  { connection, concurrency: 1 },
+);
+
+batchWorker.on('completed', (job) => {
+  console.log(`[worker] batch "${job.name}" done`);
+});
+
+batchWorker.on('failed', (job, err) => {
+  console.error(`[worker] batch ${job?.name} failed:`, err.message);
 });
 
 console.log('[worker] starting…');

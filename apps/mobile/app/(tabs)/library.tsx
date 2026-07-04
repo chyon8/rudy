@@ -80,6 +80,9 @@ export default function Library() {
             {item.summary}
           </Text>
         )}
+        {item.type === 'link' && !item.link_alive && (
+          <Text style={typo.caption}>{t('library.linkGone')}</Text>
+        )}
       </View>
       <Text style={typo.caption}>
         {new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}

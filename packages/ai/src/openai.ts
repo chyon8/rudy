@@ -10,6 +10,7 @@ import type {
   EmbeddingPort,
   LlmAnalysis,
   LlmPort,
+  NameInterestInput,
 } from './ports';
 
 const AnalysisSchema = z.object({
@@ -27,6 +28,8 @@ const BriefCopySchema = z.object({
   closing: z.string(),
   reasons: z.array(z.string()),
 });
+
+const InterestNameSchema = z.object({ name: z.string() });
 
 function systemPrompt(locale: AnalyzeInput['locale']): string {
   const lang = locale === 'ko' ? 'Korean' : 'English';
@@ -144,6 +147,34 @@ export function createOpenAiAdapters(env: Env): { llm: LlmPort; embedding: Embed
       const text = completion.choices[0]?.message.content?.trim();
       if (!text) throw new Error('Vision returned no description');
       return text;
+    },
+
+    // 신규 interest 클러스터 이름 (M5) — locale별 명사구 규칙 (docs/spec.md §5).
+    async nameInterest(input: NameInterestInput): Promise<string> {
+      const rule =
+        input.locale === 'ko'
+          ? 'a Korean noun phrase, 2 to 6 characters'
+          : 'an English noun phrase, 1 to 3 words';
+      const system = [
+        'You name a cluster of items a user saved, as a short interest label.',
+        `The name must be ${rule}. No punctuation, no quotes, no sentence.`,
+      ].join('\n');
+      const userContent = input.samples
+        .map((s) => `- ${s.title}${s.topics.length > 0 ? ` (${s.topics.join(', ')})` : ''}`)
+        .join('\n');
+
+      const completion = await client.beta.chat.completions.parse({
+        model: env.OPENAI_MODEL,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: userContent },
+        ],
+        response_format: zodResponseFormat(InterestNameSchema, 'interest_name'),
+      });
+
+      const name = completion.choices[0]?.message.parsed?.name.trim();
+      if (!name) throw new Error('Interest naming returned no name');
+      return name;
     },
   };
 

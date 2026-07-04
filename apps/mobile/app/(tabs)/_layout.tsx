@@ -27,11 +27,11 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="capture"
+        name="add"
         options={{
           title: '',
           // Capture 탭은 raised ink 원형 버튼 — 탭 전환 없이 풀스크린 모달을 연다.
-          // (listeners의 tabPress 가로채기가 기기에서 동작하지 않아 버튼 자체를 교체)
+          // (파일명은 add — capture면 /capture 모달과 라우트 충돌로 빈 화면이 열린다)
           tabBarButton: () => (
             <Pressable
               onPress={() => router.push('/capture')}

@@ -212,6 +212,9 @@ export async function generateBriefForUser(
     }),
   });
 
+  // reason 샘플 로깅 (M5) — 톤 튜닝용 관찰 창구.
+  if (copy.reasons[0]) console.log(`[brief] reason sample (${user.id}): ${copy.reasons[0]}`);
+
   const cards = selection.map((c, i) => toCardInsert(c, copy.reasons[i] ?? '', i));
 
   if (replaceBriefId) {

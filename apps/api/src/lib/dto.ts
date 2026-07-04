@@ -72,6 +72,7 @@ export function toMemoryDto(m: MemoryRow) {
     inferred_intent: m.inferredIntent,
     time_sensitivity: m.timeSensitivity,
     analysis_status: m.analysisStatus,
+    link_alive: m.linkAlive,
     created_at: m.createdAt.toISOString(),
     updated_at: m.updatedAt.toISOString(),
   };

@@ -31,6 +31,7 @@ export interface Memory {
   inferred_intent: string | null;
   time_sensitivity: string | null;
   analysis_status: 'pending' | 'ready' | 'degraded' | 'failed';
+  link_alive: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -8,6 +8,7 @@ function fakeLlm(outputs: (BriefCopy | Error)[]): { llm: LlmPort; calls: () => n
   const llm: LlmPort = {
     analyzeMemory: () => Promise.reject(new Error('unused')),
     describeImage: () => Promise.reject(new Error('unused')),
+    nameInterest: () => Promise.reject(new Error('unused')),
     writeBriefCopy: () => {
       const out = outputs[Math.min(n++, outputs.length - 1)];
       return out instanceof Error ? Promise.reject(out) : Promise.resolve(out!);

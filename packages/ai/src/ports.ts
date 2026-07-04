@@ -51,12 +51,20 @@ export interface DescribeImageInput {
   locale: Locale;
 }
 
+export interface NameInterestInput {
+  locale: Locale;
+  /** 클러스터 대표 memory들의 제목·토픽 샘플 (최대 10개). */
+  samples: { title: string; topics: string[] }[];
+}
+
 /** LLM 분석(ingestion)·문구 생성(brief)을 담당. 제공자 교체 가능하도록 추상화. */
 export interface LlmPort {
   analyzeMemory(input: AnalyzeInput): Promise<LlmAnalysis>;
   writeBriefCopy(input: BriefCopyInput): Promise<BriefCopy>;
   /** 이미지 한 줄 설명 (M4 vision) — 결과는 analyzeMemory의 본문 입력으로 쓰인다. */
   describeImage(input: DescribeImageInput): Promise<string>;
+  /** 신규 interest 클러스터 이름 (M5) — ko "2~6자 명사구" / en "1~3단어 명사구". */
+  nameInterest(input: NameInterestInput): Promise<string>;
 }
 
 /** 임베딩 생성. 차원은 구현체가 env로 주입받는다 (기본 1024). */

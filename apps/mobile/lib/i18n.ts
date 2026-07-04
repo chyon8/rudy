@@ -58,6 +58,7 @@ const en = {
     emptyInterests: 'Your interests will take shape as you save.',
     emptySearch: 'Nothing matched that. Another word might.',
     memoriesCount: '{{count}} memories',
+    linkGone: 'This link no longer opens',
   },
   memory: {
     notePlaceholder: 'Add a note to your future self',
@@ -125,6 +126,7 @@ const ko: typeof en = {
     emptyInterests: '저장할수록 관심사가 모양을 갖춰가요.',
     emptySearch: '딱 맞는 게 없었어요. 다른 말로 찾아볼까요?',
     memoriesCount: '{{count}}개 기억',
+    linkGone: '이 링크는 더 이상 열리지 않아요',
   },
   memory: {
     notePlaceholder: '미래의 나에게 메모 남기기',
