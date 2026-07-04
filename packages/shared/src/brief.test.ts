@@ -35,12 +35,15 @@ describe('coldstart 조립 (PLAN #7)', () => {
 
 describe('fallback 조립 (§4.5)', () => {
   it('최근 memory 3건을 시간 역순으로', () => {
-    const cards = pickFallbackCards([mem('a', 3), mem('b', 1), mem('c', 2), mem('d', 0)], 'ko');
+    const cards = pickFallbackCards([mem('a', 3), mem('b', 1), mem('c', 2), mem('d', 0)], [], 'ko');
     expect(cards.map((c) => c.memoryId)).toEqual(['d', 'b', 'c']);
     expect(cards.every((c) => c.curationReason.length > 0)).toBe(true);
   });
 
-  it('memory가 3건 미만이면 있는 만큼', () => {
-    expect(pickFallbackCards([mem('a', 0)], 'en')).toHaveLength(1);
+  it('memory가 3건 미만이면 discovery로 최소 3장을 채운다', () => {
+    const cards = pickFallbackCards([mem('a', 0)], ['cooking'], 'en');
+    expect(cards).toHaveLength(3);
+    expect(cards[0]?.memoryId).toBe('a');
+    expect(cards.filter((c) => c.cardType === 'discovery')).toHaveLength(2);
   });
 });

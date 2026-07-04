@@ -121,8 +121,9 @@ async function findBrief(db: Db, userId: string, briefDate: string) {
 }
 
 /**
- * 동기 생성 (§4.5): memory < 15 → coldstart (정식 Day 0 구성, status='generated'),
- * 그 외 → fallback (최근 3건, status='fallback' — 배치가 이후 승격 가능).
+ * 동기 생성 (§4.5): memory < 15 → coldstart (Day 0 구성), 그 외 → fallback (최근 3건 + discovery 보충).
+ * 둘 다 status='fallback'으로 저장 — 배치의 정식 엔진(3~5장)이 이후 승격할 수 있어야 한다.
+ * (기존엔 coldstart를 'generated'로 저장해 하루 종일 앙상한 브리핑에 갇히는 결함이 있었다.)
  */
 async function createSyncBrief(db: Db, user: UserRow, briefDate: string): Promise<void> {
   const locale = user.locale as Locale;
@@ -137,7 +138,7 @@ async function createSyncBrief(db: Db, user: UserRow, briefDate: string): Promis
   const coldstart = recent.length < SCORING.coldstartMemoryThreshold;
   const seeds = coldstart
     ? pickColdstartCards(recent, user.onboardingInterests, locale)
-    : pickFallbackCards(recent, locale);
+    : pickFallbackCards(recent, user.onboardingInterests, locale);
 
   await insertBriefWithCards(
     db,
@@ -146,7 +147,7 @@ async function createSyncBrief(db: Db, user: UserRow, briefDate: string): Promis
       briefDate,
       greeting: coldstart ? tone.templates.greeting(user.displayName) : tone.templates.fallbackGreeting,
       closing: tone.templates.closing,
-      status: coldstart ? 'generated' : 'fallback',
+      status: 'fallback',
     },
     seeds.map((s) => ({
       memoryId: s.memoryId,

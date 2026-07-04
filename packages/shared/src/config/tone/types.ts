@@ -19,8 +19,8 @@ export interface ToneGuide {
     closing: string;
     /** 금지어 필터 2회 실패 시 쓰는 reason_code별 정적 템플릿. */
     reasons: Record<ReasonCode, string>;
-    /** fallback 브리핑 카드용 정적 이유. */
-    fallbackReason: string;
+    /** fallback 브리핑 카드용 정적 이유 — 카드마다 회전시켜 같은 문장 반복을 막는다. */
+    fallbackReasons: string[];
     coldstartDiscoveryReason: (interestLabel: string) => string;
     /** 푸시: hero 카드 예고 1문장 (§4.6). */
     pushPreview: (heroTitle: string) => string;

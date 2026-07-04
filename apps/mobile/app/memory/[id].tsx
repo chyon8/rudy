@@ -53,6 +53,16 @@ export default function MemoryScreen() {
     month: 'long',
     day: 'numeric',
   });
+  const domain = (() => {
+    if (!mem.source_url) return null;
+    try {
+      return new URL(mem.source_url).hostname.replace(/^www\./, '');
+    } catch {
+      return null;
+    }
+  })();
+  // 분석 전이어도 화면이 비지 않게 — 제목은 도메인/본문 첫 줄까지 폴백.
+  const title = mem.title ?? domain ?? mem.raw_text?.split('\n')[0] ?? '';
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
@@ -65,12 +75,40 @@ export default function MemoryScreen() {
             style={{ width: '100%', aspectRatio: 16 / 9, borderRadius: rounded.lg }}
           />
         )}
-        <Text style={typo.displayMd}>{mem.title ?? ''}</Text>
+        <View style={{ gap: spacing.xxs }}>
+          <Text style={typo.displayMd}>{title}</Text>
+          <Text style={typo.caption}>
+            {[domain, t('memory.savedOn', { date: savedDate })].filter(Boolean).join(' · ')}
+          </Text>
+        </View>
+
         {mem.summary ? (
           <Text style={typo.bodyMd}>{mem.summary}</Text>
         ) : (
           <Text style={typo.bodySm}>{t('home.stillReading')}</Text>
         )}
+
+        {mem.topics.length > 0 && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+            {mem.topics.map((topic) => (
+              <View
+                key={topic}
+                style={{
+                  backgroundColor: colors.surfaceStrong,
+                  borderRadius: rounded.pill,
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: spacing.xxs,
+                }}
+              >
+                <Text style={typo.caption}>{topic}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {reason ? (
+          <Text style={[typo.bodySm, { fontStyle: 'italic' }]}>{reason}</Text>
+        ) : null}
 
         <AppTextInput
           value={note}
@@ -80,7 +118,6 @@ export default function MemoryScreen() {
           multiline
           style={{ minHeight: 72, textAlignVertical: 'top' }}
         />
-        <Text style={typo.caption}>{t('memory.savedOn', { date: savedDate })}</Text>
 
         {mem.linked_memories.length > 0 && (
           <View style={{ gap: spacing.xs }}>
@@ -112,8 +149,6 @@ export default function MemoryScreen() {
             </ScrollView>
           </View>
         )}
-
-        {reason ? <Text style={typo.bodyMd}>{reason}</Text> : null}
       </ScrollView>
 
       {mem.source_url && (

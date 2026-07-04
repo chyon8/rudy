@@ -36,6 +36,10 @@ const en = {
   },
   home: {
     stillReading: 'Rudy is still reading this one',
+    discoveryLabel: 'Something new',
+    reflectionLabel: 'Lately you',
+    savedToday: 'Saved today',
+    savedDaysAgo: 'Saved {{count}}d ago',
     closing: "That's all for today. I'll have more ready tomorrow.",
     open: 'Open',
     like: 'Like',
@@ -104,6 +108,10 @@ const ko: typeof en = {
   },
   home: {
     stillReading: 'Rudy가 아직 읽고 있어요',
+    discoveryLabel: '새로운 발견',
+    reflectionLabel: '요즘의 나',
+    savedToday: '오늘 저장',
+    savedDaysAgo: '{{count}}일 전 저장',
     closing: '오늘은 여기까지예요. 내일 또 준비해둘게요.',
     open: '열기',
     like: '좋아요',

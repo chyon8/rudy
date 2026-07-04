@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { FlatList, Image, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,15 @@ import { api, type Interest, type Memory } from '../../lib/api';
 import { colors, rounded, spacing } from '../../lib/theme';
 
 type Tab = 'all' | 'interests' | 'search';
+
+function domainOf(url: string | null): string {
+  if (!url) return '';
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
 
 /** Library (PRD S5~S7) — 전체(무한 스크롤 허용) / 관심사 / 시맨틱 검색. */
 export default function Library() {
@@ -39,13 +48,16 @@ export default function Library() {
     }
   };
 
-  useEffect(() => {
-    void loadFirst();
-    api
-      .getInterests()
-      .then(({ items: list }) => setInterests(list.filter((i) => i.memory_count >= 1))) // H3
-      .catch(() => undefined);
-  }, [loadFirst]);
+  // 탭 포커스마다 재조회 — 방금 저장한 memory가 바로 보여야 한다 (저장 신뢰).
+  useFocusEffect(
+    useCallback(() => {
+      if (!interestFilter) void loadFirst();
+      api
+        .getInterests()
+        .then(({ items: list }) => setInterests(list.filter((i) => i.memory_count >= 1))) // H3
+        .catch(() => undefined);
+    }, [loadFirst, interestFilter]),
+  );
 
   const search = async () => {
     if (!query.trim()) return;
@@ -73,7 +85,7 @@ export default function Library() {
       )}
       <View style={{ flex: 1 }}>
         <Text style={typo.titleSm} numberOfLines={1}>
-          {item.title ?? item.raw_text ?? ''}
+          {item.title ?? item.raw_text ?? domainOf(item.source_url)}
         </Text>
         {item.summary && (
           <Text style={typo.bodySm} numberOfLines={1}>

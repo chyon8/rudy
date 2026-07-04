@@ -34,7 +34,11 @@ export const toneEn: ToneGuide = {
       surprise: 'Something a little different from your collection.',
       cold_start: 'You saved this just now — here is how Rudy understood it.',
     },
-    fallbackReason: 'Something you saved recently, worth another look.',
+    fallbackReasons: [
+      'Something you saved recently, worth another look.',
+      'This one has been sitting quietly since you saved it.',
+      'A recent save — see if it still sparks something.',
+    ],
     coldstartDiscoveryReason: (interestLabel) => `Picked for your interest in ${interestLabel}.`,
     pushPreview: (heroTitle) => `Your morning brief is ready — starting with "${heroTitle}".`,
     pushHidden: 'Your Home for today is ready.',

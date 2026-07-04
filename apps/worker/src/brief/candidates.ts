@@ -35,7 +35,13 @@ export async function collectCandidates(db: Db, userId: string, now: Date): Prom
     .select()
     .from(memories)
     .where(and(eq(memories.userId, userId), isNull(memories.deletedAt)));
-  const eligibleMemories = memRows.filter((m) => isEligibleRediscovery(m, now));
+  let eligibleMemories = memRows.filter((m) => isEligibleRediscovery(m, now));
+  // 후보가 최소 구성(3장)에 못 미치면 쿨다운을 단계 완화 (21→7→0일) — 앙상한 Home 방지.
+  // never/suppress/dead-link 제외는 완화해도 유지된다.
+  for (const relaxedDays of [7, 0]) {
+    if (eligibleMemories.length >= SCORING.cards.min) break;
+    eligibleMemories = memRows.filter((m) => isEligibleRediscovery(m, now, relaxedDays));
+  }
 
   const interestRows = await db.select().from(interests).where(eq(interests.userId, userId));
   const activeInterests = interestRows.filter(

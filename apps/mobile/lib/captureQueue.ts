@@ -32,13 +32,26 @@ export async function enqueueCapture(capture: PendingCapture): Promise<void> {
   await writeQueue([...queue, capture]);
 }
 
-const URL_RE = /^https?:\/\/\S+$/i;
+const FULL_URL_RE = /^https?:\/\/\S+$/i;
+const BARE_URL_RE = /^(www\.)?[a-z0-9-]+(\.[a-z0-9-]{2,})+(\/\S*)?$/i;
+const URL_IN_TEXT_RE = /https?:\/\/\S+/i;
 
+/**
+ * 형식 자동 인식 (규칙 기반, AI 아님):
+ * URL 단독 → link / 스킴 없는 도메인("youtube.com/…") → link / 본문 속 URL → link + 나머지는 메모 /
+ * 그 외 → thought. 이미지는 Share Extension 경로에서 type='image'로 들어온다.
+ */
 export function toCapture(text: string): PendingCapture {
   const trimmed = text.trim();
-  return URL_RE.test(trimmed)
-    ? { localId: `${Date.now()}`, type: 'link', source_url: trimmed }
-    : { localId: `${Date.now()}`, type: 'thought', raw_text: trimmed };
+  const localId = `${Date.now()}`;
+  if (FULL_URL_RE.test(trimmed)) return { localId, type: 'link', source_url: trimmed };
+  if (BARE_URL_RE.test(trimmed)) return { localId, type: 'link', source_url: `https://${trimmed}` };
+  const inText = trimmed.match(URL_IN_TEXT_RE);
+  if (inText) {
+    const note = trimmed.replace(inText[0], '').trim();
+    return { localId, type: 'link', source_url: inText[0], user_note: note || undefined };
+  }
+  return { localId, type: 'thought', raw_text: trimmed };
 }
 
 async function send(capture: PendingCapture): Promise<void> {

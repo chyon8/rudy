@@ -21,6 +21,8 @@ export interface BriefCopyCard {
   title: string;
   summary?: string;
   userNote?: string;
+  /** reason의 구체성 재료 — 콘텐츠 근거 없는 감성 문구 방지. */
+  topics?: string[];
   reasonCode: string;
   cardType: string;
   ageDays: number;

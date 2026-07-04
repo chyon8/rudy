@@ -35,7 +35,11 @@ export const toneKo: ToneGuide = {
       surprise: '조금 결이 다른 걸 하나 골라봤어요.',
       cold_start: '방금 남긴 기억이에요. Rudy가 이렇게 이해했어요.',
     },
-    fallbackReason: '최근에 남겨둔 기억이에요. 다시 봐도 좋겠어요.',
+    fallbackReasons: [
+      '최근에 남겨둔 기억이에요. 다시 봐도 좋겠어요.',
+      '저장해두고 지나쳤던 것, 지금 보면 새로울 거예요.',
+      '얼마 전의 내가 골라둔 것이에요.',
+    ],
     coldstartDiscoveryReason: (interestLabel) => `${interestLabel}에 관심이 있다고 하셔서 골라봤어요.`,
     pushPreview: (heroTitle) => `아침 브리핑이 준비됐어요 — "${heroTitle}"부터 볼까요.`,
     pushHidden: '오늘의 Home이 준비됐어요.',

@@ -47,7 +47,9 @@ describe('템플릿 자체 검증', () => {
       expect(findToneViolation(tone.templates.greeting(null), locale)).toBeNull();
       expect(findToneViolation(tone.templates.fallbackGreeting, locale)).toBeNull();
       expect(findToneViolation(tone.templates.closing, locale)).toBeNull();
-      expect(isValidReason(tone.templates.fallbackReason, locale)).toBe(true);
+      for (const r of tone.templates.fallbackReasons) {
+        expect(isValidReason(r, locale)).toBe(true);
+      }
       expect(isValidReason(tone.templates.coldstartDiscoveryReason('Cooking'), locale)).toBe(true);
       for (const reason of Object.values(tone.templates.reasons)) {
         expect(isValidReason(reason, locale)).toBe(true);

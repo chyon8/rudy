@@ -38,7 +38,7 @@ function toDiscoverySeed(s: ColdstartSource, reason: string, position: number): 
 }
 
 /** 온보딩 관심사 key에 매칭되는 discovery 소스를 라운드로빈으로 뽑는다. 미매칭이면 전체 풀에서. */
-function pickDiscoverySources(
+export function pickDiscoverySources(
   onboardingKeys: string[],
   locale: Locale,
   count: number,
@@ -75,8 +75,8 @@ function pickDiscoverySources(
 }
 
 /**
- * 콜드스타트 조립 (PLAN #7): 방금 저장한 memory 1장(cold_start) + 관심사 매칭 discovery 2장.
- * memory 0건이면 discovery 3장. 어떤 입력에서도 카드 ≥ 1을 보장한다.
+ * 콜드스타트 조립 (PLAN #7): 최근 memory 최대 3장(cold_start) + 관심사 매칭 discovery 2장.
+ * memory 0건이면 discovery 3장. 어떤 입력에서도 카드 ≥ 3장을 보장한다 (앙상한 Home 방지).
  */
 export function pickColdstartCards(
   memories: MemoryLite[],
@@ -86,29 +86,39 @@ export function pickColdstartCards(
   const tone = getTone(locale);
   const cards: BriefCardSeed[] = [];
 
-  const latest = [...memories].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-  if (latest) {
+  const recents = [...memories]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, 3);
+  for (const [i, m] of recents.entries()) {
     cards.push({
-      memoryId: latest.id,
+      memoryId: m.id,
       externalContent: null,
       cardType: 'rediscovery',
       reasonCode: 'cold_start',
-      curationReason: tone.templates.reasons.cold_start,
-      position: 0,
+      // 첫 장은 cold_start 문구, 나머지는 회전 — 같은 문장이 연달아 반복되지 않게.
+      curationReason:
+        i === 0
+          ? tone.templates.reasons.cold_start
+          : tone.templates.fallbackReasons[(i - 1) % tone.templates.fallbackReasons.length]!,
+      position: cards.length,
     });
   }
 
-  const discoveryCount = latest ? 2 : 3;
+  const discoveryCount = recents.length === 0 ? 3 : 2;
   for (const { source, label } of pickDiscoverySources(onboardingKeys, locale, discoveryCount)) {
     cards.push(toDiscoverySeed(source, tone.templates.coldstartDiscoveryReason(label), cards.length));
   }
   return cards;
 }
 
-/** Fallback 조립 (생성 실패/배치 전 GET): 최근 memory 3건 + 템플릿 문구. */
-export function pickFallbackCards(memories: MemoryLite[], locale: Locale): BriefCardSeed[] {
+/** Fallback 조립 (생성 실패/배치 전 GET): 최근 memory 3건, 부족하면 discovery로 최소 3장. */
+export function pickFallbackCards(
+  memories: MemoryLite[],
+  onboardingKeys: string[],
+  locale: Locale,
+): BriefCardSeed[] {
   const tone = getTone(locale);
-  return [...memories]
+  const cards: BriefCardSeed[] = [...memories]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 3)
     .map((m, i) => ({
@@ -116,7 +126,13 @@ export function pickFallbackCards(memories: MemoryLite[], locale: Locale): Brief
       externalContent: null,
       cardType: 'rediscovery' as const,
       reasonCode: 'timing' as const,
-      curationReason: tone.templates.fallbackReason,
+      curationReason: tone.templates.fallbackReasons[i % tone.templates.fallbackReasons.length]!,
       position: i,
     }));
+  if (cards.length < 3) {
+    for (const { source, label } of pickDiscoverySources(onboardingKeys, locale, 3 - cards.length)) {
+      cards.push(toDiscoverySeed(source, tone.templates.coldstartDiscoveryReason(label), cards.length));
+    }
+  }
+  return cards;
 }

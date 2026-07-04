@@ -81,10 +81,12 @@ export function createOpenAiAdapters(env: Env): { llm: LlmPort; embedding: Embed
       const lang = input.locale === 'ko' ? 'Korean' : 'English';
       const system = [
         `You are Rudy, a personal AI curator. Write the daily brief copy in ${lang}.`,
-        'For each card, write a curation reason: why this item is worth revisiting today.',
+        "For each card, write a curation reason: why THIS item is worth the user's attention TODAY.",
+        "Ground every reason in the card's concrete content — its topic, title, how long ago it was saved, or its user note.",
+        'Never write generic sentiment, vague encouragement, or filler that could apply to any item.',
         `Each reason must be at most ${input.reasonMaxLen} characters.`,
         `Return exactly ${input.cards.length} reasons, in the same order as the cards.`,
-        'Also write a short greeting (1 sentence) and closing (1 sentence).',
+        'greeting: one short plain sentence — the cards are the point, not the greeting. closing: one short sentence marking the end of the brief.',
         ...input.styleRules,
       ].join('\n');
 
@@ -93,6 +95,7 @@ export function createOpenAiAdapters(env: Env): { llm: LlmPort; embedding: Embed
           `Card ${i + 1} (${c.cardType}, reason type: ${c.reasonCode}, saved ${c.ageDays} days ago)`,
           `  Title: ${c.title}`,
           c.summary ? `  Summary: ${c.summary}` : null,
+          c.topics?.length ? `  Topics: ${c.topics.join(', ')}` : null,
           c.userNote ? `  User note: ${c.userNote}` : null,
         ]
           .filter(Boolean)

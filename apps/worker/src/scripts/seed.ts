@@ -8,10 +8,11 @@
 import { createOpenAiAdapters } from '@rudy/ai';
 import { createDb, dailyBriefs, memories, users } from '@rudy/db';
 import { createStorage, loadEnv, normalizeUrl } from '@rudy/shared';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { generateBriefForUser } from '../brief/generate';
 import { ingestMemory } from '../ingest/pipeline';
+import { runInterestEngineForUser } from '../interest/engine';
 
 const env = loadEnv();
 const db = createDb(env.DATABASE_URL);
@@ -25,21 +26,43 @@ interface SeedItem {
   text?: string;
 }
 
+// 30건 — 형식(유튜브/아티클/생각)·주제·시점을 섞는다. 최근 열흘에 러닝 관련 저장이
+// 몰려 있어 Interest Engine의 rising 감지와 reflection 카드까지 검증 가능하다.
 const SEEDS: SeedItem[] = [
-  { daysAgo: 3, type: 'link', url: 'https://www.paulgraham.com/greatwork.html' },
-  { daysAgo: 4, type: 'thought', text: '주말에 홈카페 라떼아트 연습해보기. 우유 스티밍부터.' },
-  { daysAgo: 6, type: 'link', url: 'https://www.youtube.com/watch?v=jNQXAC9IVRw' },
-  { daysAgo: 9, type: 'link', url: 'https://nesslabs.com/mindful-productivity' },
-  { daysAgo: 12, type: 'thought', text: '사이드 프로젝트 아이디어: 동네 러닝 코스를 기록하고 공유하는 앱' },
-  { daysAgo: 14, type: 'link', url: 'https://jamesclear.com/atomic-habits' },
-  { daysAgo: 18, type: 'link', url: 'https://www.youtube.com/watch?v=9bZkp7q19f0' },
-  { daysAgo: 21, type: 'thought', text: '제주 한 달 살기 하면 뭐부터 할까. 동쪽 vs 서쪽?' },
+  // ── 최근 러닝 클러스터 (rising 재료) ──
+  { daysAgo: 1, type: 'thought', text: '오늘 처음으로 5km를 안 쉬고 뛰었다. 무릎은 아직 괜찮은 듯.' },
+  { daysAgo: 2, type: 'link', url: 'https://www.youtube.com/watch?v=brFHyOtTwH4' },
+  { daysAgo: 3, type: 'thought', text: '러닝화 카본화 vs 데일리화 — 초보는 쿠션 좋은 데일리화부터라던데.' },
+  { daysAgo: 5, type: 'link', url: 'https://www.runnersworld.com/beginner/a20812270/how-to-start-running-today/' },
+  { daysAgo: 6, type: 'thought', text: '10월 하프마라톤 접수 열리면 바로 신청하기. 목표 2시간 15분.' },
+  { daysAgo: 8, type: 'thought', text: '사이드 프로젝트 아이디어: 동네 러닝 코스를 기록하고 공유하는 앱' },
+  { daysAgo: 9, type: 'link', url: 'https://www.youtube.com/watch?v=_kGESn8ArrU' },
+  // ── 배움/생산성 ──
+  { daysAgo: 4, type: 'link', url: 'https://www.paulgraham.com/greatwork.html' },
+  { daysAgo: 12, type: 'link', url: 'https://nesslabs.com/mindful-productivity' },
+  { daysAgo: 15, type: 'link', url: 'https://jamesclear.com/atomic-habits' },
+  { daysAgo: 22, type: 'link', url: 'https://jamesclear.com/goals-systems' },
+  { daysAgo: 30, type: 'link', url: 'https://fs.blog/mental-models/' },
+  { daysAgo: 38, type: 'link', url: 'https://www.youtube.com/watch?v=arj7oStGLkU' },
+  { daysAgo: 55, type: 'link', url: 'https://calnewport.com/blog' },
+  { daysAgo: 70, type: 'link', url: 'https://www.youtube.com/watch?v=UF8uR6Z6KLc' },
   { daysAgo: 28, type: 'link', url: 'https://waitbutwhy.com/2015/01/artificial-intelligence-revolution-1.html' },
+  { daysAgo: 85, type: 'link', url: 'https://waitbutwhy.com/2014/05/life-weeks.html' },
+  // ── 생각/아이디어 ──
+  { daysAgo: 7, type: 'thought', text: '주말에 홈카페 라떼아트 연습해보기. 우유 스티밍부터.' },
+  { daysAgo: 13, type: 'thought', text: '읽은 책을 한 줄로 요약해서 모아두면 연말에 재밌겠다.' },
+  { daysAgo: 21, type: 'thought', text: '제주 한 달 살기 하면 뭐부터 할까. 동쪽 vs 서쪽?' },
+  { daysAgo: 35, type: 'thought', text: '회의 없는 수요일을 팀에 제안해볼까. 오전만이라도.' },
+  { daysAgo: 48, type: 'thought', text: '베란다에 방울토마토 키우기 — 5월이 적기라고 함.' },
+  { daysAgo: 60, type: 'thought', text: '부모님 결혼기념일 선물 알아보기 — 여행 상품권이 나으려나' },
+  { daysAgo: 95, type: 'thought', text: '영어 회화, 인풋만 늘리지 말고 일주일에 한 번은 말하기 세션.' },
+  // ── 여행/음식/문화 ──
+  { daysAgo: 18, type: 'link', url: 'https://www.youtube.com/watch?v=9bZkp7q19f0' },
   { daysAgo: 32, type: 'link', url: 'https://www.atlasobscura.com/places' },
   { daysAgo: 45, type: 'link', url: 'https://www.seriouseats.com' },
-  { daysAgo: 60, type: 'thought', text: '부모님 결혼기념일 선물 알아보기 — 여행 상품권이 나으려나' },
-  { daysAgo: 75, type: 'link', url: 'https://calnewport.com/blog' },
+  { daysAgo: 52, type: 'link', url: 'https://www.sprudge.com' },
   { daysAgo: 90, type: 'link', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+  { daysAgo: 110, type: 'link', url: 'https://www.youtube.com/watch?v=jNQXAC9IVRw' },
 ];
 
 async function main() {
@@ -75,11 +98,17 @@ async function main() {
   }
   console.log(`[seed] inserted ${inserted.length} memories`);
 
-  // 2. 분석 안 된 memory 전부 인라인 ingestion (기존 pending 포함).
+  // 2. 분석 안 된 memory 전부 인라인 ingestion (pending + 과거 실패한 degraded 재시도).
   const pendingRows = await db
     .select({ id: memories.id })
     .from(memories)
-    .where(and(eq(memories.userId, user.id), isNull(memories.deletedAt), eq(memories.analysisStatus, 'pending')));
+    .where(
+      and(
+        eq(memories.userId, user.id),
+        isNull(memories.deletedAt),
+        inArray(memories.analysisStatus, ['pending', 'degraded']),
+      ),
+    );
   console.log(`[seed] analyzing ${pendingRows.length} memories…`);
   for (const [i, row] of pendingRows.entries()) {
     try {
@@ -90,7 +119,11 @@ async function main() {
     }
   }
 
-  // 3. 오늘 브리핑 삭제 후 정식 엔진으로 재생성 (데모 전용 — 하루 1회 규칙 우회).
+  // 3. Interest Engine 즉시 실행 — 관심사 클러스터·rising까지 만들어 검증 상태 완성.
+  console.log('[seed] running interest engine…');
+  await runInterestEngineForUser({ db, llm }, { id: user.id, locale: user.locale });
+
+  // 4. 오늘 브리핑 삭제 후 정식 엔진으로 재생성 (데모 전용 — 하루 1회 규칙 우회).
   const local = DateTime.now().setZone(user.timezone || 'UTC');
   const briefDate = local.toISODate()!;
   await db.delete(dailyBriefs).where(and(eq(dailyBriefs.userId, user.id), eq(dailyBriefs.briefDate, briefDate)));

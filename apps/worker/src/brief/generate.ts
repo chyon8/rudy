@@ -8,9 +8,9 @@ import {
   type Db,
 } from '@rudy/db';
 import {
-  COLDSTART_SOURCES,
   SCORING,
   getTone,
+  pickDiscoverySources,
   pickFallbackCards,
   type Locale,
   type ReasonCode,
@@ -92,23 +92,24 @@ function buildCandidates(bundle: CandidateBundle, user: UserRow, local: DateTime
     });
   }
 
-  // Discovery: 콜드스타트 사용자(memory < 15)만, 온보딩 관심사 key 화이트리스트 매칭.
-  if (bundle.memoryCount < SCORING.coldstartMemoryThreshold) {
+  // Discovery: 콜드스타트 사용자(memory < 15) 또는 rediscovery 후보 부족 시 보충.
+  // 온보딩 관심사 key 매칭, 미매칭이면 프리셋 전체 풀 (pickDiscoverySources).
+  if (
+    bundle.memoryCount < SCORING.coldstartMemoryThreshold ||
+    bundle.eligibleMemories.length < SCORING.cards.min
+  ) {
     const locale = user.locale as Locale;
-    for (const key of user.onboardingInterests) {
-      const sources = COLDSTART_SOURCES[key]?.[locale] ?? COLDSTART_SOURCES[key]?.en ?? [];
-      for (const s of sources) {
-        out.push({
-          key: s.url,
-          cardType: 'discovery',
-          memoryId: null,
-          externalContent: { url: s.url, title: s.title, thumbnail_url: s.thumbnail_url, source: s.source },
-          score: SCORING.baseScore.discovery,
-          breakdown: null,
-          reasonCode: 'cold_start',
-          interestId: null,
-        });
-      }
+    for (const { source: s } of pickDiscoverySources(user.onboardingInterests, locale, 4)) {
+      out.push({
+        key: s.url,
+        cardType: 'discovery',
+        memoryId: null,
+        externalContent: { url: s.url, title: s.title, thumbnail_url: s.thumbnail_url, source: s.source },
+        score: SCORING.baseScore.discovery,
+        breakdown: null,
+        reasonCode: 'cold_start',
+        interestId: null,
+      });
     }
   }
 
@@ -204,6 +205,7 @@ export async function generateBriefForUser(
       return {
         title: mem?.title ?? c.externalContent?.title ?? 'Untitled',
         summary: mem?.summary ?? undefined,
+        topics: mem?.topics ?? undefined,
         userNote: mem?.type === 'link' ? (mem.rawText ?? undefined) : undefined,
         reasonCode: c.reasonCode as ReasonCode,
         cardType: c.cardType,
@@ -244,7 +246,7 @@ export async function createFallbackBrief(db: Db, user: UserRow, briefDate: stri
     .where(and(eq(memories.userId, user.id), isNull(memories.deletedAt)))
     .orderBy(desc(memories.createdAt))
     .limit(3);
-  const seeds = pickFallbackCards(recent, locale);
+  const seeds = pickFallbackCards(recent, user.onboardingInterests, locale);
   if (seeds.length === 0) return; // memory 0건 — GET의 coldstart 경로가 처리
   const tone = getTone(locale);
   await insertBriefWithCards(

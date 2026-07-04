@@ -73,7 +73,7 @@ CLAUDE.md 규칙과 충돌하는 판단이 필요하면 멈추고 질문.
 3. **컨펌 대기 → git 메시지 제공** — 사용자가 컨펌하면 `git add` → `git commit` → `git push`까지
    **복붙 가능한 명령/메시지**를 준다.
    - **⛔ 절대 터미널에서 직접 실행하지 않는다.** 사용자가 복붙해서 직접 돌린다. (초기 setup 1회 푸시만 예외였음)
-   - 커밋 메시지 말미: `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`
+   - **커밋 메시지에 Co-Authored-By 등 AI 서명을 넣지 않는다.**
 
 ## Development Behavior — Karpathy Guidelines
 

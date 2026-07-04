@@ -188,17 +188,29 @@ hairlines; the only depth signal is the Hero card's single atmospheric orb.
 
 ### Home & Atmospheric
 
-**`home-header`** — Background `{colors.canvas}`, greeting in `{typography.display-md}` (ink) + date in `{typography.body-sm}` (muted). Profile icon top-right opens Settings.
+**`home-header`** — Background `{colors.canvas}`. Date first in `{typography.caption-uppercase}`, greeting below as ONE quiet line in `{typography.body-md}` (`{colors.muted}`). The header must never compete with the cards — content is the protagonist, the greeting is a whisper. Profile icon top-right opens Settings.
 
-**`card-hero`** — Position 0 of the Home stack, always exactly one per day. Background `{colors.surface-card}`, rounded `{rounded.lg}` (20px), padding `{spacing.lg}`. Carries a single atmospheric orb bloom (see Decorative Depth) behind a 16:9 thumbnail, then title (`{typography.title-md}`), curation_reason (`{typography.body-md}`, `{colors.body}`), then a full-width `{component.button-primary}` as the primary open action. Feedback row (👍 / ⋯ menu with "stop showing this") sits bottom-right, small and quiet.
+**`card-hero`** — Position 0 of the Home stack, always exactly one per day. Background `{colors.surface-card}`, rounded `{rounded.lg}` (20px), padding `{spacing.lg}`. Carries a single atmospheric orb bloom (see Decorative Depth) behind a 16:9 thumbnail, then: title (`{typography.display-md}` — magazine headline), meta line (`{typography.caption}`: "domain · saved Nd ago"), summary (`{typography.body-md}`, ≤3 lines — what the content actually is), curation_reason (`{typography.body-sm}` italic — the curator's aside, visually subordinate to the content), then a full-width `{component.button-primary}` as the primary open action. Feedback row (👍 / ⋯ menu with "stop showing this") sits bottom-right, small and quiet. **Order matters: content (title/meta/summary) before commentary (reason). Never let template copy outweigh the saved thing itself.**
 
-**`card-support`** — Positions 1–3 of the Home stack. Same internal structure as `card-hero` at smaller scale (thumbnail 64×64 or omitted), rounded `{rounded.md}` (12px), no orb, no shadow. `{spacing.sm}` gap between support cards.
+**`card-support`** — Positions 1–4 of the Home stack. Base: rounded `{rounded.md}` (12px), no orb, no shadow, `{spacing.sm}` gap between support cards. Content decides the variant (never a user-facing category label — the form itself carries the difference):
+
+- **`card-support-video`** — content_type 'video' or a YouTube URL. Full-width 16:9 thumbnail with `{component.play-badge}` overlay, then title (`{typography.title-sm}`, 2 lines), meta caption ("domain · saved Nd ago"), summary (`{typography.body-sm}`, `{colors.body}`, 2 lines), curation_reason (`{typography.body-sm}` italic).
+- **`card-support-article`** — default for links. Horizontal: 64×64 thumbnail (or `{component.domain-tile}` when no image), title, meta caption, summary (2 lines), curation_reason italic.
+- **`card-support-thought`** — user's own words as a quotation: text in `{typography.display-md}` scaled to 18/26 wrapped in quotation marks (“ ”), max 4 lines, meta caption + curation_reason italic below. No thumbnail ever.
+- **`card-support-discovery`** — article layout topped with `{typography.caption-uppercase}` label "Something new · {source}". The only card that names its own kind, because it is not the user's memory.
+- **`card-support-reflection`** — no thumbnail; `{typography.caption-uppercase}` label "Lately you" + interest name as title + curation_reason.
+
+**`play-badge`** — 40×40 circle, `rgba(28,23,18,0.72)` on top of a video thumbnail, centered, white Feather `play` icon 16px. Video cards only (hero and support).
+
+**`domain-tile`** — 64×64 (`{rounded.sm}`) `{colors.surface-strong}` tile with the domain's first letter in `{typography.display-md}` — thumbnail fallback for link cards so no card renders bare text-only by accident.
+
+The hero follows the same content rules: a video hero gets the `{component.play-badge}` on its 16:9 thumbnail, a thought hero renders as a large `{typography.display-md}` quotation with no image, a discovery hero carries the uppercase label. Link heroes show a domain caption under the title.
 
 **`home-closing`** — No background (canvas continues). Centered `{typography.body-sm}` in `{colors.muted}`: "That's all for today. I'll have more ready tomorrow." Extra top padding (32px) to read as a deliberate stop — the explicit end of the Home screen (Product Rule 3: no infinite scroll).
 
 ### Card Detail
 
-**`card-detail-sheet`** — Modal sheet presentation, `{component.elevation.modal-drop}` on the sheet's top edge. Background `{colors.canvas}`. Large thumbnail → title (`{typography.display-md}`) → editable user-note input → saved-date caption → horizontal-scroll `{component.connected-memory-chip}` row (max 3) → curation_reason full text (`{typography.body-md}`) → sticky-bottom `{component.button-primary}` (primary open action) → feedback row.
+**`card-detail-sheet`** — Modal sheet presentation, `{component.elevation.modal-drop}` on the sheet's top edge. Background `{colors.canvas}`. Large thumbnail → title (`{typography.display-md}`, falls back to domain / first line so the sheet is never blank even before analysis) → meta caption ("domain · saved date") → summary (`{typography.body-md}`) → topic chips (`{colors.surface-strong}` pills, `{typography.caption}`) → curation_reason (`{typography.body-sm}` italic) → editable user-note input → horizontal-scroll `{component.connected-memory-chip}` row (max 3) → sticky-bottom `{component.button-primary}` (primary open action).
 
 **`connected-memory-chip`** — Background `{colors.surface-strong}`, rounded `{rounded.md}`, 96px width, small thumbnail + one-line title (`{typography.caption}`).
 

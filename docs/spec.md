@@ -145,8 +145,8 @@ DNS resolve 후 사설/링크로컬 IP 차단(169.254.x, localhost, 10.x 등), r
 
 단계:
 1. 콘텐츠 추출
-   - YouTube URL: oEmbed로 제목/썸네일/채널. 자막 MVP 제외.
-   - 일반 웹: safeFetch → OG 태그 + readability 본문 (최대 3000자).
+   - YouTube URL: oEmbed로 제목/썸네일/채널. oEmbed 실패해도 videoId 기반 `i.ytimg.com` 썸네일 폴백. 자막 MVP 제외.
+   - 일반 웹: safeFetch → OG 태그(og → twitter 폴백) + readability 본문 (최대 3000자).
    - 이미지: **M4** (StoragePort 저장 + vision 한 줄 설명). M1~M3는 API만 받고 분석 비활성.
    - thought: raw_text 그대로.
 2. LLM 분석 (단일 호출, **OpenAI Structured Outputs `response_format: json_schema, strict:true`**)
@@ -168,8 +168,11 @@ tick 밀린 사용자는 다음 tick "notify_time 이전 && 오늘 brief 없음"
 ### 4.1 후보 수집 (user별)
 - **Rediscovery**: analysis_status='ready', is_excluded=false, suppressed_until < now,
   (last_surfaced_at IS NULL OR < now−21d), dated & expires_at<now 제외, link_alive=true.
+  - **쿨다운 단계 완화**: 후보 < 3장이면 쿨다운 21→7→0일 순으로 완화해 재수집 (앙상한 Home 방지).
+    never(is_excluded)·suppress·죽은 링크 제외는 완화해도 유지.
 - **Reflection**: momentum ≥ 0.5인 rising interest 있을 때만 1건. (momentum은 M5 전까진 0 → 자연히 미생성)
-- **Discovery**: memory 수 < 15인 콜드스타트 사용자만. `/config/coldstart_sources.json` 화이트리스트에서 온보딩 관심사 key 매칭.
+- **Discovery**: memory 수 < 15인 콜드스타트 사용자 **또는 rediscovery 후보 < 3장일 때 보충**.
+  `/config/coldstart_sources.json` 화이트리스트에서 온보딩 관심사 key 매칭, 미매칭이면 프리셋 전체 풀.
 
 ### 4.2 스코어링 (결정적, LLM 금지 — 상수는 `/config/scoring.ts` 한 파일)
 ```
@@ -194,10 +197,12 @@ score = 0.35*interest_alignment   // memory↔rising/stable interest 최대 cosi
 - 입력: 카드별 {title, summary, user_note, reason_code, 경과일}, 오늘 날짜/요일, 사용자 이름.
 - **§11 톤 가이드(locale별) 시스템 프롬프트 포함.** 금지어 필터 실패 → 1회 재생성 → 또 실패 시 reason_code별 템플릿.
 
-### 4.5 Fallback vs Coldstart (분리된 경로)
-- **Coldstart** (memory < 15 && 오늘 brief 없음): 방금 저장한 memory 카드(reason_code='cold_start') 1장
-  + 온보딩 관심사 매칭 discovery 2장. memory 0건이면 온보딩 관심사 discovery로만.
-- **Fallback** (생성 실패 시): 최근 memory 3건(시간 역순) + 템플릿 greeting, status='fallback'.
+### 4.5 Fallback vs Coldstart (분리된 경로 — 둘 다 카드 ≥ 3장, status='fallback')
+- **Coldstart** (memory < 15 && 오늘 brief 없음): 최근 memory 최대 3장(reason_code='cold_start')
+  + 온보딩 관심사 매칭 discovery 2장. memory 0건이면 discovery 3장.
+- **Fallback** (생성 실패 시): 최근 memory 3건(시간 역순) + 템플릿 greeting. 3건 미만이면 discovery로 보충.
+- 둘 다 **status='fallback'으로 저장** — 배치의 정식 엔진이 이후 승격할 수 있어야 한다.
+  (coldstart를 'generated'로 저장하면 하루 종일 앙상한 브리핑에 갇힌다 — 결함 수정됨.)
 - 동시성: `INSERT ... ON CONFLICT DO NOTHING` 후 재조회.
 - **승격 규칙**: 배치는 status='fallback'이고 **카드 피드백(impression 포함) 0건**인 brief만 교체 가능. (#2)
 

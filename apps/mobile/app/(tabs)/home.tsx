@@ -5,6 +5,7 @@ import * as Linking from 'expo-linking';
 import { useCallback, useRef, useState } from 'react';
 import { ActionSheetIOS, Alert, Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Orb, PrimaryButton, Skeleton, useTypo } from '../../components/ui';
 import { api, type Brief, type BriefCard, type FeedbackAction } from '../../lib/api';
@@ -23,6 +24,72 @@ function cardTitle(card: BriefCard, stillReading: string): { title: string; summ
     return { title: card.memory.title ?? '', summary: card.memory.summary };
   }
   return { title: card.external_content?.title ?? '', summary: card.external_content?.source ?? null };
+}
+
+function domainOf(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+/** "언제 저장했나" — 카드의 즉물적 맥락. 도메인과 함께 메타 라인을 만든다. */
+function metaLine(card: BriefCard, t: TFunction): string | null {
+  const parts: string[] = [];
+  const domain = domainOf(card.memory?.source_url ?? card.external_content?.url);
+  if (domain) parts.push(domain);
+  if (card.memory) {
+    const days = Math.floor((Date.now() - new Date(card.memory.created_at).getTime()) / 86400000);
+    parts.push(days <= 0 ? t('home.savedToday') : t('home.savedDaysAgo', { count: days }));
+  }
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/** 카드 시각 포맷 — 콘텐츠 종류를 규칙으로 판별 (DESIGN.md card variants). */
+type CardKind = 'video' | 'thought' | 'article' | 'discovery' | 'reflection';
+
+function kindOf(card: BriefCard): CardKind {
+  if (card.card_type === 'discovery') return 'discovery';
+  if (card.card_type === 'reflection') return 'reflection';
+  const m = card.memory;
+  if (m?.type === 'thought') return 'thought';
+  const domain = domainOf(m?.source_url);
+  if (m?.content_type === 'video' || domain === 'youtube.com' || domain === 'youtu.be' || domain === 'm.youtube.com') {
+    return 'video';
+  }
+  return 'article';
+}
+
+/** 비디오 썸네일 위 재생 배지 (DESIGN.md play-badge). */
+function PlayBadge() {
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <View
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: 'rgba(28,23,18,0.72)',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Feather name="play" size={16} color="#ffffff" style={{ marginLeft: 2 }} />
+      </View>
+    </View>
+  );
 }
 
 /** Home — 하루 1회 브리핑. 당겨서 새로고침·무한스크롤 없음 (Product Rule 3·4). */
@@ -148,11 +215,13 @@ export default function Home() {
         paddingBottom: spacing.section,
       }}
     >
-      {/* home-header */}
+      {/* home-header — 날짜가 먼저, 인사말은 한 줄 보조. 주인공은 카드다. */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View style={{ flex: 1, paddingRight: spacing.base }}>
-          <Text style={typo.displayMd}>{brief?.greeting ?? " "}</Text>
-          <Text style={[typo.bodySm, { marginTop: spacing.xxs }]}>{dateLabel}</Text>
+          <Text style={typo.captionUppercase}>{dateLabel}</Text>
+          <Text style={[typo.bodyMd, { marginTop: spacing.xxs, color: colors.muted }]}>
+            {brief?.greeting ?? ' '}
+          </Text>
         </View>
         <Pressable hitSlop={8} onPress={() => router.push('/settings')}>
           <Feather name="user" size={22} color={colors.ink} />
@@ -169,73 +238,177 @@ export default function Home() {
         </View>
       )}
 
-      {/* card-hero */}
-      {!loading && hero && (
-        <Pressable
-          onPress={() => openCard(hero)}
-          style={{
-            marginTop: spacing.section,
-            backgroundColor: colors.surfaceCard,
-            borderRadius: rounded.lg,
-            borderWidth: 1,
-            borderColor: colors.hairline,
-            padding: spacing.lg,
-            overflow: 'hidden',
-          }}
-        >
-          <View style={{ position: 'absolute', top: -60, right: -40 }}>
-            <Orb color={orbColorByCardType[hero.card_type] ?? colors.gradientLavender} />
-          </View>
-          {(hero.memory?.thumbnail_url ?? hero.external_content?.thumbnail_url) && (
-            <Image
-              source={{ uri: hero.memory?.thumbnail_url ?? hero.external_content?.thumbnail_url ?? undefined }}
-              style={{ width: '100%', aspectRatio: 16 / 9, borderRadius: rounded.md, marginBottom: spacing.base }}
-            />
-          )}
-          <Text style={typo.titleMd}>{cardTitle(hero, t('home.stillReading')).title}</Text>
-          {hero.curation_reason && (
-            <Text style={[typo.bodyMd, { marginTop: spacing.xs }]}>{hero.curation_reason}</Text>
-          )}
-          <PrimaryButton label={t('home.open')} onPress={() => openPrimary(hero)} style={{ marginTop: spacing.base }} />
-          {feedbackRow(hero)}
-        </Pressable>
-      )}
+      {/* card-hero — 콘텐츠 종류별 변형 (DESIGN.md card variants) */}
+      {!loading &&
+        hero &&
+        (() => {
+          const kind = kindOf(hero);
+          const thumb = hero.memory?.thumbnail_url ?? hero.external_content?.thumbnail_url;
+          const meta = metaLine(hero, t);
+          const { title, summary } = cardTitle(hero, t('home.stillReading'));
+          return (
+            <Pressable
+              onPress={() => openCard(hero)}
+              style={{
+                marginTop: spacing.section,
+                backgroundColor: colors.surfaceCard,
+                borderRadius: rounded.lg,
+                borderWidth: 1,
+                borderColor: colors.hairline,
+                padding: spacing.lg,
+                overflow: 'hidden',
+              }}
+            >
+              <View style={{ position: 'absolute', top: -60, right: -40 }}>
+                <Orb color={orbColorByCardType[hero.card_type] ?? colors.gradientLavender} />
+              </View>
+              {kind === 'discovery' && (
+                <Text style={[typo.captionUppercase, { marginBottom: spacing.xs }]}>
+                  {t('home.discoveryLabel')}
+                  {hero.external_content?.source ? ` · ${hero.external_content.source}` : ''}
+                </Text>
+              )}
+              {kind === 'thought' ? (
+                <>
+                  <Text style={typo.displayMd}>“{hero.memory?.raw_text ?? title}”</Text>
+                  {meta && <Text style={[typo.caption, { marginTop: spacing.xs }]}>{meta}</Text>}
+                </>
+              ) : (
+                <>
+                  {thumb && (
+                    <View style={{ marginBottom: spacing.base }}>
+                      <Image
+                        source={{ uri: thumb }}
+                        style={{ width: '100%', aspectRatio: 16 / 9, borderRadius: rounded.md }}
+                      />
+                      {kind === 'video' && <PlayBadge />}
+                    </View>
+                  )}
+                  <Text style={typo.displayMd}>{title}</Text>
+                  {meta && <Text style={[typo.caption, { marginTop: spacing.xxs }]}>{meta}</Text>}
+                  {summary && (
+                    <Text style={[typo.bodyMd, { marginTop: spacing.xs }]} numberOfLines={3}>
+                      {summary}
+                    </Text>
+                  )}
+                </>
+              )}
+              {hero.curation_reason && (
+                <Text style={[typo.bodySm, { marginTop: spacing.xs, fontStyle: 'italic' }]}>
+                  {hero.curation_reason}
+                </Text>
+              )}
+              <PrimaryButton label={t('home.open')} onPress={() => openPrimary(hero)} style={{ marginTop: spacing.base }} />
+              {feedbackRow(hero)}
+            </Pressable>
+          );
+        })()}
 
-      {/* card-support */}
+      {/* card-support — 비디오/생각 인용/아티클/발견/회고 변형 */}
       {!loading && supports.length > 0 && (
         <View style={{ marginTop: spacing.section, gap: spacing.sm }}>
           {supports.map((card) => {
+            const kind = kindOf(card);
             const { title, summary } = cardTitle(card, t('home.stillReading'));
             const thumb = card.memory?.thumbnail_url ?? card.external_content?.thumbnail_url;
-            return (
-              <Pressable
-                key={card.id}
-                onPress={() => openCard(card)}
-                style={{
-                  backgroundColor: colors.surfaceCard,
-                  borderRadius: rounded.md,
-                  borderWidth: 1,
-                  borderColor: colors.hairline,
-                  padding: spacing.base,
-                }}
-              >
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            const domain = domainOf(card.memory?.source_url ?? card.external_content?.url);
+            const meta = metaLine(card, t);
+            const reason = card.curation_reason;
+            const base = {
+              backgroundColor: colors.surfaceCard,
+              borderRadius: rounded.md,
+              borderWidth: 1,
+              borderColor: colors.hairline,
+              padding: spacing.base,
+            };
+            const reasonLine = reason ? (
+              <Text style={[typo.bodySm, { marginTop: spacing.xxs, fontStyle: 'italic' }]} numberOfLines={2}>
+                {reason}
+              </Text>
+            ) : null;
+
+            if (kind === 'thought') {
+              return (
+                <Pressable key={card.id} onPress={() => openCard(card)} style={base}>
+                  <Text style={[typo.displayMd, { fontSize: 18, lineHeight: 26 }]} numberOfLines={4}>
+                    “{card.memory?.raw_text ?? title}”
+                  </Text>
+                  {meta && <Text style={[typo.caption, { marginTop: spacing.xs }]}>{meta}</Text>}
+                  {reasonLine}
+                  {feedbackRow(card)}
+                </Pressable>
+              );
+            }
+
+            if (kind === 'video') {
+              return (
+                <Pressable key={card.id} onPress={() => openCard(card)} style={base}>
                   {thumb && (
-                    <Image source={{ uri: thumb }} style={{ width: 64, height: 64, borderRadius: rounded.sm }} />
+                    <View style={{ marginBottom: spacing.sm }}>
+                      <Image
+                        source={{ uri: thumb }}
+                        style={{ width: '100%', aspectRatio: 16 / 9, borderRadius: rounded.sm }}
+                      />
+                      <PlayBadge />
+                    </View>
                   )}
+                  <Text style={typo.titleSm} numberOfLines={2}>
+                    {title}
+                  </Text>
+                  {meta && <Text style={[typo.caption, { marginTop: 2 }]}>{meta}</Text>}
+                  {summary && (
+                    <Text style={[typo.bodySm, { marginTop: spacing.xxs, color: colors.body }]} numberOfLines={2}>
+                      {summary}
+                    </Text>
+                  )}
+                  {reasonLine}
+                  {feedbackRow(card)}
+                </Pressable>
+              );
+            }
+
+            // article / discovery / reflection — 가로형. 썸네일 없으면 도메인 이니셜 타일.
+            return (
+              <Pressable key={card.id} onPress={() => openCard(card)} style={base}>
+                {kind === 'discovery' && (
+                  <Text style={[typo.captionUppercase, { marginBottom: spacing.xs }]}>
+                    {t('home.discoveryLabel')}
+                    {card.external_content?.source ? ` · ${card.external_content.source}` : ''}
+                  </Text>
+                )}
+                {kind === 'reflection' && (
+                  <Text style={[typo.captionUppercase, { marginBottom: spacing.xs }]}>
+                    {t('home.reflectionLabel')}
+                  </Text>
+                )}
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  {thumb ? (
+                    <Image source={{ uri: thumb }} style={{ width: 64, height: 64, borderRadius: rounded.sm }} />
+                  ) : kind !== 'reflection' && domain ? (
+                    <View
+                      style={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: rounded.sm,
+                        backgroundColor: colors.surfaceStrong,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text style={typo.displayMd}>{domain[0]?.toUpperCase()}</Text>
+                    </View>
+                  ) : null}
                   <View style={{ flex: 1 }}>
                     <Text style={typo.titleSm} numberOfLines={2}>
                       {title}
                     </Text>
-                    {card.curation_reason ? (
-                      <Text style={[typo.bodySm, { marginTop: spacing.xxs }]} numberOfLines={2}>
-                        {card.curation_reason}
-                      </Text>
-                    ) : summary ? (
-                      <Text style={[typo.bodySm, { marginTop: spacing.xxs }]} numberOfLines={2}>
+                    {meta && <Text style={[typo.caption, { marginTop: 2 }]}>{meta}</Text>}
+                    {summary && (
+                      <Text style={[typo.bodySm, { marginTop: spacing.xxs, color: colors.body }]} numberOfLines={2}>
                         {summary}
                       </Text>
-                    ) : null}
+                    )}
+                    {reasonLine}
                   </View>
                 </View>
                 {feedbackRow(card)}
