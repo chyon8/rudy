@@ -1,0 +1,39 @@
+# secrets — 절대 커밋 금지
+.env
+.env.local
+.env.*.local
+*.pem
+*.p8
+*.mobileprovision
+
+# node
+node_modules/
+.pnpm-store/
+dist/
+build/
+*.tsbuildinfo
+coverage/
+
+# expo / rn
+.expo/
+.expo-shared/
+ios/Pods/
+ios/build/
+android/.gradle/
+android/app/build/
+*.keystore
+
+# uploads (dev 로컬 스토리지)
+/uploads/
+apps/api/uploads/
+
+# logs / os
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
