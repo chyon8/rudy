@@ -36,5 +36,7 @@ export const toneEn: ToneGuide = {
     },
     fallbackReason: 'Something you saved recently, worth another look.',
     coldstartDiscoveryReason: (interestLabel) => `Picked for your interest in ${interestLabel}.`,
+    pushPreview: (heroTitle) => `Your morning brief is ready — starting with "${heroTitle}".`,
+    pushHidden: 'Your Home for today is ready.',
   },
 };

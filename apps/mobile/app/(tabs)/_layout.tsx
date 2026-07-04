@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { Tabs, router } from 'expo-router';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { colors, rounded } from '../../lib/theme';
 
@@ -30,28 +30,27 @@ export default function TabsLayout() {
         name="capture"
         options={{
           title: '',
-          // Capture 탭은 raised ink 원형 버튼 — 탭 전환 대신 풀스크린 모달을 연다.
-          tabBarIcon: () => (
-            <View
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: rounded.full,
-                backgroundColor: colors.primary,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginTop: -12,
-              }}
+          // Capture 탭은 raised ink 원형 버튼 — 탭 전환 없이 풀스크린 모달을 연다.
+          // (listeners의 tabPress 가로채기가 기기에서 동작하지 않아 버튼 자체를 교체)
+          tabBarButton: () => (
+            <Pressable
+              onPress={() => router.push('/capture')}
+              style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
             >
-              <Feather name="plus" size={24} color={colors.onPrimary} />
-            </View>
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: rounded.full,
+                  backgroundColor: colors.primary,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Feather name="plus" size={24} color={colors.onPrimary} />
+              </View>
+            </Pressable>
           ),
-        }}
-        listeners={{
-          tabPress: (e) => {
-            e.preventDefault();
-            router.push('/capture');
-          },
         }}
       />
       <Tabs.Screen

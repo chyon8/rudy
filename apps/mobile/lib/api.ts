@@ -118,12 +118,36 @@ async function request<T>(path: string, init: { method?: string; body?: unknown 
   return data as T;
 }
 
+/** 이미지 업로드 (M4) — RN multipart. Share Extension flush 경로에서 사용. */
+export async function uploadImage(fileUri: string): Promise<{ url: string; key: string }> {
+  const name = fileUri.split('/').pop() ?? 'image.jpg';
+  const ext = name.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const mime = ext === 'png' ? 'image/png' : ext === 'heic' ? 'image/heic' : 'image/jpeg';
+  const form = new FormData();
+  form.append('file', { uri: fileUri, name, type: mime } as unknown as Blob);
+  const res = await fetch(`${BASE_URL}/v1/uploads`, {
+    method: 'POST',
+    headers: token ? { authorization: `Bearer ${token}` } : undefined,
+    body: form,
+  });
+  if (!res.ok) throw new ApiError('upload_failed', res.status, 'Image upload failed');
+  return (await res.json()) as { url: string; key: string };
+}
+
 export const api = {
   devLogin: (email: string, timezone: string, locale: Locale) =>
     request<{ token: string; user: User }>('/v1/auth/dev', { method: 'POST', body: { email, timezone, locale } }),
+  appleLogin: (identityToken: string, displayName: string | undefined, timezone: string, locale: Locale) =>
+    request<{ token: string; user: User }>('/v1/auth/apple', {
+      method: 'POST',
+      body: { identity_token: identityToken, display_name: displayName, timezone, locale },
+    }),
   getMe: () => request<User>('/v1/me'),
-  patchMe: (patch: Partial<Pick<User, 'notify_time' | 'timezone' | 'display_name' | 'locale' | 'hide_notification_content'>>) =>
-    request<User>('/v1/me', { method: 'PATCH', body: patch }),
+  patchMe: (
+    patch: Partial<Pick<User, 'notify_time' | 'timezone' | 'display_name' | 'locale' | 'hide_notification_content'>> & {
+      expo_push_token?: string | null;
+    },
+  ) => request<User>('/v1/me', { method: 'PATCH', body: patch }),
   onboard: (interests: { key?: string; label: string }[]) =>
     request<{ interests: { id: string; name: string }[] }>('/v1/me/onboarding', {
       method: 'POST',
@@ -131,8 +155,13 @@ export const api = {
     }),
   deleteMe: () => request<void>('/v1/me', { method: 'DELETE' }),
 
-  createMemory: (body: { type: 'link' | 'thought'; source_url?: string; raw_text?: string }) =>
-    request<{ id: string; analysis_status: string }>('/v1/memories', { method: 'POST', body }),
+  createMemory: (body: {
+    type: 'link' | 'thought' | 'image';
+    source_url?: string;
+    raw_text?: string;
+    user_note?: string;
+    image_url?: string;
+  }) => request<{ id: string; analysis_status: string }>('/v1/memories', { method: 'POST', body }),
   getMemory: (id: string) => request<MemoryDetail>(`/v1/memories/${id}`),
   updateMemoryNote: (id: string, user_note: string) =>
     request<Memory>(`/v1/memories/${id}`, { method: 'PATCH', body: { user_note } }),

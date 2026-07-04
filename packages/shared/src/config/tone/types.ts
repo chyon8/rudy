@@ -22,5 +22,9 @@ export interface ToneGuide {
     /** fallback 브리핑 카드용 정적 이유. */
     fallbackReason: string;
     coldstartDiscoveryReason: (interestLabel: string) => string;
+    /** 푸시: hero 카드 예고 1문장 (§4.6). */
+    pushPreview: (heroTitle: string) => string;
+    /** 푸시: 잠금화면 내용 숨김 시 문구. */
+    pushHidden: string;
   };
 }

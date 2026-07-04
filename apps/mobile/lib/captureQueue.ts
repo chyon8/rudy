@@ -1,17 +1,21 @@
 /**
- * Quick Capture 로컬 큐 — 낙관적 UI의 뒷단. POST 실패 시 큐에 남기고,
- * 다음 flush(앱 재개·다음 캡처)에서 재시도한다. 저장은 유실되지 않는다 (Product Rule 7).
+ * 캡처 로컬 큐 — 낙관적 UI의 뒷단. POST 실패 시 큐에 남기고, 다음 flush(앱 재개·다음 캡처)에서
+ * 재시도한다. 저장은 유실되지 않는다 (Product Rule 7).
+ * Share Extension(M4)도 같은 큐를 쓴다 — App Group AsyncStorage로 메인 앱과 공유.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from './api';
+import { api, uploadImage } from './api';
 
 const QUEUE_KEY = 'rudy.captureQueue';
 
 export interface PendingCapture {
   localId: string;
-  type: 'link' | 'thought';
+  type: 'link' | 'thought' | 'image';
   source_url?: string;
   raw_text?: string;
+  user_note?: string;
+  /** image 타입: App Group 컨테이너의 파일 경로 (Share Extension이 적재). */
+  file_uri?: string;
 }
 
 async function readQueue(): Promise<PendingCapture[]> {
@@ -23,6 +27,11 @@ async function writeQueue(queue: PendingCapture[]): Promise<void> {
   await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
 }
 
+export async function enqueueCapture(capture: PendingCapture): Promise<void> {
+  const queue = await readQueue();
+  await writeQueue([...queue, capture]);
+}
+
 const URL_RE = /^https?:\/\/\S+$/i;
 
 export function toCapture(text: string): PendingCapture {
@@ -32,14 +41,28 @@ export function toCapture(text: string): PendingCapture {
     : { localId: `${Date.now()}`, type: 'thought', raw_text: trimmed };
 }
 
+async function send(capture: PendingCapture): Promise<void> {
+  if (capture.type === 'image') {
+    if (!capture.file_uri) return;
+    const { url } = await uploadImage(capture.file_uri);
+    await api.createMemory({ type: 'image', image_url: url, user_note: capture.user_note });
+    return;
+  }
+  await api.createMemory({
+    type: capture.type,
+    source_url: capture.source_url,
+    raw_text: capture.raw_text,
+    user_note: capture.user_note,
+  });
+}
+
 /** 저장 시도 — 실패하면 큐에 적재하고 false 반환 (UI는 이미 성공으로 처리). */
 export async function submitCapture(capture: PendingCapture): Promise<boolean> {
   try {
-    await api.createMemory({ type: capture.type, source_url: capture.source_url, raw_text: capture.raw_text });
+    await send(capture);
     return true;
   } catch {
-    const queue = await readQueue();
-    await writeQueue([...queue, capture]);
+    await enqueueCapture(capture);
     return false;
   }
 }
@@ -51,7 +74,7 @@ export async function flushCaptureQueue(): Promise<void> {
   const remaining: PendingCapture[] = [];
   for (const item of queue) {
     try {
-      await api.createMemory({ type: item.type, source_url: item.source_url, raw_text: item.raw_text });
+      await send(item);
     } catch {
       remaining.push(item);
     }

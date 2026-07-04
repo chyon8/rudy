@@ -1,12 +1,43 @@
 import type { EmbeddingPort, LlmPort, Locale } from '@rudy/ai';
 import { type Db, interests, memories, memoryInterests, memoryLinks, users } from '@rudy/db';
+import { storageKeyFromUrl, type StoragePort } from '@rudy/shared';
 import { and, cosineDistance, eq, isNull, ne, sql } from 'drizzle-orm';
-import { extractContent } from './extract';
+import { extractContent, type Extracted } from './extract';
 
 export interface IngestDeps {
   db: Db;
   llm: LlmPort;
   embedding: EmbeddingPort;
+  storage: StoragePort;
+}
+
+const MIME_BY_EXT: Record<string, string> = {
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  heic: 'image/heic',
+};
+
+/** 이미지 memory: 저장된 파일 → vision 한 줄 설명 → 이후 일반 분석 흐름에 합류 (M4). */
+async function extractImage(
+  mem: { thumbnailUrl: string | null },
+  llm: LlmPort,
+  storage: StoragePort,
+  locale: Locale,
+): Promise<Extracted> {
+  if (!mem.thumbnailUrl) return {};
+  const key = storageKeyFromUrl(mem.thumbnailUrl);
+  if (!key) return {};
+  const bytes = await storage.getBytes(key);
+  const ext = key.split('.').pop() ?? 'jpg';
+  const description = await llm.describeImage({
+    imageBase64: bytes.toString('base64'),
+    mimeType: MIME_BY_EXT[ext] ?? 'image/jpeg',
+    locale,
+  });
+  const title = description.length > 60 ? `${description.slice(0, 57)}…` : description;
+  return { title, body: description };
 }
 
 const LINK_THRESHOLD = 0.82;
@@ -21,27 +52,40 @@ function domainOf(sourceUrl: string | null): string {
   }
 }
 
+/** thought는 URL이 없어 도메인 폴백이 불가 — 본문 첫 줄을 제목으로 쓴다. */
+function fallbackTitle(mem: { type: string; rawText: string | null; sourceUrl: string | null }): string {
+  if (mem.type === 'thought' && mem.rawText) {
+    const firstLine = mem.rawText.trim().split('\n')[0] ?? '';
+    return firstLine.length > 60 ? `${firstLine.slice(0, 57)}…` : firstLine;
+  }
+  return domainOf(mem.sourceUrl);
+}
+
 async function userLocale(db: Db, userId: string): Promise<Locale> {
   const rows = await db.select({ locale: users.locale }).from(users).where(eq(users.id, userId)).limit(1);
   return rows[0]?.locale ?? 'en';
 }
 
 export async function ingestMemory(memoryId: string, deps: IngestDeps): Promise<void> {
-  const { db, llm, embedding } = deps;
+  const { db, llm, embedding, storage } = deps;
   const rows = await db.select().from(memories).where(eq(memories.id, memoryId)).limit(1);
   const mem = rows[0];
   if (!mem || mem.deletedAt) return;
 
-  // 1. 추출 (실패해도 Memory는 유지 — 분석 단계로 진행).
-  let extracted;
+  const locale = await userLocale(db, mem.userId);
+
+  // 1. 추출 (실패해도 Memory는 유지 — 분석 단계로 진행). 이미지는 vision 경유 (M4).
+  let extracted: Extracted;
   try {
-    extracted = await extractContent({ type: mem.type, sourceUrl: mem.sourceUrl, rawText: mem.rawText });
+    extracted =
+      mem.type === 'image'
+        ? await extractImage(mem, llm, storage, locale)
+        : await extractContent({ type: mem.type, sourceUrl: mem.sourceUrl, rawText: mem.rawText });
   } catch {
     extracted = {};
   }
 
   // 2. LLM 분석 (실패 시 throw → BullMQ 재시도).
-  const locale = await userLocale(db, mem.userId);
   const analysis = await llm.analyzeMemory({
     title: extracted.title ?? mem.title ?? undefined,
     body: extracted.body,
@@ -59,7 +103,7 @@ export async function ingestMemory(memoryId: string, deps: IngestDeps): Promise<
   await db
     .update(memories)
     .set({
-      title: extracted.title ?? mem.title ?? domainOf(mem.sourceUrl),
+      title: extracted.title ?? mem.title ?? fallbackTitle(mem),
       thumbnailUrl: extracted.thumbnailUrl ?? mem.thumbnailUrl,
       summary: analysis.summary,
       contentType: analysis.contentType,
@@ -138,7 +182,7 @@ export async function markDegraded(db: Db, memoryId: string): Promise<void> {
     .update(memories)
     .set({
       analysisStatus: 'degraded',
-      title: mem.title ?? domainOf(mem.sourceUrl),
+      title: mem.title ?? fallbackTitle(mem),
       updatedAt: new Date(),
     })
     .where(eq(memories.id, memoryId));

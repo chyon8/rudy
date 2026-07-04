@@ -6,6 +6,7 @@ import type {
   AnalyzeInput,
   BriefCopy,
   BriefCopyInput,
+  DescribeImageInput,
   EmbeddingPort,
   LlmAnalysis,
   LlmPort,
@@ -116,6 +117,33 @@ export function createOpenAiAdapters(env: Env): { llm: LlmPort; embedding: Embed
         throw new Error('Brief copy generation returned no parsed content');
       }
       return parsed;
+    },
+
+    // 이미지 한 줄 설명 — gpt-4o-mini vision (M4).
+    async describeImage(input: DescribeImageInput): Promise<string> {
+      const lang = input.locale === 'ko' ? 'Korean' : 'English';
+      const completion = await client.chat.completions.create({
+        model: env.OPENAI_MODEL,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Describe what this saved image is about in one plain ${lang} sentence. If it contains text (screenshot, poster), include the key text content.`,
+              },
+              {
+                type: 'image_url',
+                image_url: { url: `data:${input.mimeType};base64,${input.imageBase64}` },
+              },
+            ],
+          },
+        ],
+        max_tokens: 200,
+      });
+      const text = completion.choices[0]?.message.content?.trim();
+      if (!text) throw new Error('Vision returned no description');
+      return text;
     },
   };
 

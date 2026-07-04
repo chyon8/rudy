@@ -42,6 +42,8 @@ export function registerMemoryRoutes(app: AppType): void {
           sourceUrl: body.source_url ?? null,
           sourceUrlNormalized: normalized,
           rawText: note ?? null,
+          // image 타입: 업로드된 파일 URL — vision 분석(M4)이 이 파일을 읽는다.
+          thumbnailUrl: body.type === 'image' ? (body.image_url ?? null) : null,
         })
         .returning();
       const mem = inserted[0];

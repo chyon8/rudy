@@ -37,5 +37,7 @@ export const toneKo: ToneGuide = {
     },
     fallbackReason: '최근에 남겨둔 기억이에요. 다시 봐도 좋겠어요.',
     coldstartDiscoveryReason: (interestLabel) => `${interestLabel}에 관심이 있다고 하셔서 골라봤어요.`,
+    pushPreview: (heroTitle) => `아침 브리핑이 준비됐어요 — "${heroTitle}"부터 볼까요.`,
+    pushHidden: '오늘의 Home이 준비됐어요.',
   },
 };

@@ -1,14 +1,23 @@
 import { createOpenAiAdapters } from '@rudy/ai';
 import { createDb } from '@rudy/db';
-import { QUEUE_BRIEF, QUEUE_INGEST, loadEnv } from '@rudy/shared';
+import {
+  QUEUE_BRIEF,
+  QUEUE_INGEST,
+  QUEUE_PUSH,
+  createStorage,
+  loadEnv,
+  type PushJobData,
+} from '@rudy/shared';
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { runBriefTick } from './brief/scheduler';
 import { ingestMemory, markDegraded } from './ingest/pipeline';
+import { processPushJob } from './push/send';
 
 const env = loadEnv();
 const db = createDb(env.DATABASE_URL);
 const { llm, embedding } = createOpenAiAdapters(env);
+const storage = createStorage(env);
 const connection = new IORedis(env.REDIS_URL, { maxRetriesPerRequest: null });
 
 interface IngestJobData {
@@ -18,7 +27,7 @@ interface IngestJobData {
 const worker = new Worker<IngestJobData>(
   QUEUE_INGEST,
   async (job) => {
-    await ingestMemory(job.data.memoryId, { db, llm, embedding });
+    await ingestMemory(job.data.memoryId, { db, llm, embedding, storage });
   },
   { connection, concurrency: 4 },
 );
@@ -41,12 +50,13 @@ worker.on('failed', async (job, err) => {
 
 // Brief 스케줄러 — 15분 repeatable tick (docs/spec.md §4).
 const briefQueue = new Queue(QUEUE_BRIEF, { connection });
+const pushQueue = new Queue<PushJobData>(QUEUE_PUSH, { connection });
 await briefQueue.upsertJobScheduler('brief-tick', { every: 15 * 60 * 1000 }, { name: 'tick' });
 
 const briefWorker = new Worker(
   QUEUE_BRIEF,
   async () => {
-    await runBriefTick({ db, llm });
+    await runBriefTick({ db, llm, pushQueue });
   },
   { connection, concurrency: 1 },
 );
@@ -57,6 +67,23 @@ briefWorker.on('ready', () => {
 
 briefWorker.on('failed', (_job, err) => {
   console.error('[worker] brief tick failed:', err.message);
+});
+
+// 푸시 발송 — brief 완료 시 예약된 delayed job (§4.6).
+const pushWorker = new Worker<PushJobData>(
+  QUEUE_PUSH,
+  async (job) => {
+    await processPushJob(db, env, job.data);
+  },
+  { connection, concurrency: 2 },
+);
+
+pushWorker.on('completed', (job) => {
+  console.log(`[worker] push sent: ${job.id}`);
+});
+
+pushWorker.on('failed', (job, err) => {
+  console.error(`[worker] push ${job?.id} failed:`, err.message);
 });
 
 console.log('[worker] starting…');

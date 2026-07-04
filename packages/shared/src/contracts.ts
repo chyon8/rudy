@@ -17,6 +17,20 @@ export const AuthDevBodySchema = z.object({
   locale: LocaleSchema.optional(),
 });
 
+export const AuthAppleBodySchema = z.object({
+  identity_token: z.string().min(1),
+  // Apple은 이름을 최초 1회만 내려줌 — 클라이언트가 그때 전달.
+  display_name: z.string().optional(),
+  timezone: z.string().optional(),
+  locale: LocaleSchema.optional(),
+});
+
+export const AuthGoogleBodySchema = z.object({
+  id_token: z.string().min(1),
+  timezone: z.string().optional(),
+  locale: LocaleSchema.optional(),
+});
+
 export const CreateMemoryBodySchema = z
   .object({
     type: MemoryTypeSchema,
@@ -24,6 +38,8 @@ export const CreateMemoryBodySchema = z
     raw_text: z.string().optional(),
     user_note: z.string().optional(),
     shared_from: z.string().optional(),
+    // image 타입: POST /v1/uploads가 돌려준 URL (M4).
+    image_url: z.string().url().optional(),
   })
   .refine((b) => b.type !== 'link' || Boolean(b.source_url), {
     message: 'source_url is required for link memories',
@@ -32,6 +48,10 @@ export const CreateMemoryBodySchema = z
   .refine((b) => b.type !== 'thought' || Boolean(b.raw_text), {
     message: 'raw_text is required for thought memories',
     path: ['raw_text'],
+  })
+  .refine((b) => b.type !== 'image' || Boolean(b.image_url), {
+    message: 'image_url is required for image memories',
+    path: ['image_url'],
   });
 
 export const UpdateMemoryBodySchema = z.object({
@@ -66,6 +86,8 @@ export const FeedbackBodySchema = z.object({ action: FeedbackActionSchema });
 
 export type Locale = z.infer<typeof LocaleSchema>;
 export type AuthDevBody = z.infer<typeof AuthDevBodySchema>;
+export type AuthAppleBody = z.infer<typeof AuthAppleBodySchema>;
+export type AuthGoogleBody = z.infer<typeof AuthGoogleBodySchema>;
 export type CreateMemoryBody = z.infer<typeof CreateMemoryBodySchema>;
 export type UpdateMemoryBody = z.infer<typeof UpdateMemoryBodySchema>;
 export type SearchBody = z.infer<typeof SearchBodySchema>;

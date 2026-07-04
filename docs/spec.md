@@ -98,8 +98,13 @@ v1.1 스키마 델타가 아래에 이미 통합돼 있다 (locale, push token, 
 - POST /auth/apple, POST /auth/google → { token, user }  — **M4**.
 - JWT 만료 30일, refresh 토큰 없음.
 
+### Uploads (M4)
+- **POST /uploads** — multipart 1파일(image/*, ≤10MB) → StoragePort 저장 → { key, url }.
+  image memory는 이 url을 POST /memories의 `image_url`로 전달한다.
+
 ### Memories
-- **POST /memories** body: { type, source_url?, raw_text?, user_note?, shared_from? }
+- **POST /memories** body: { type, source_url?, raw_text?, user_note?, shared_from?, image_url? }
+  - image 타입은 image_url 필수 (POST /uploads 결과).
   - DB insert → ingest 큐 enqueue → 즉시 201 { id, analysis_status:'pending' }.
   - **p95 300ms. AI 호출을 이 경로에 절대 넣지 않는다.**
   - URL 정규화 충돌 시 **기존 memory 반환**(user_note 있으면 raw_text에 append, updated_at 갱신). (F4)
@@ -234,8 +239,9 @@ score = 0.35*interest_alignment   // memory↔rising/stable interest 최대 cosi
 
 ## 7. Storage (StoragePort — M4)
 
-- 인터페이스 put/getPublicUrl. dev = API 로컬 디스크(`/uploads` static), prod = S3 호환.
-- env: `STORAGE_DRIVER=local|s3` (+ S3_BUCKET/REGION/ENDPOINT). 이미지 유입 경로가 공유시트라 M4에 구현.
+- 인터페이스 put/getPublicUrl/**getBytes** (getBytes는 vision 분석용 — 로컬 URL은 OpenAI가 못 읽어 base64 전달 필요).
+- dev = API 로컬 디스크(`/uploads` static, `UPLOADS_DIR` 공유 — api·worker 동일 경로), prod = S3 호환 (**MVP 미구현** — env=s3면 부팅 에러).
+- env: `STORAGE_DRIVER=local|s3`, `UPLOADS_DIR`, `PUBLIC_BASE_URL` (+ S3 3종은 v1.x).
 
 ---
 

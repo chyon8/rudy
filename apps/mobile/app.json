@@ -10,11 +10,32 @@
     "plugins": [
       "expo-router",
       "expo-localization",
-      "expo-font"
+      "expo-font",
+      "expo-apple-authentication",
+      "expo-notifications",
+      "./plugins/withShareExtensionAppGroupStorage.js",
+      [
+        "expo-share-extension",
+        {
+          "activationRules": [
+            { "type": "url", "max": 1 },
+            { "type": "text" },
+            { "type": "image", "max": 1 }
+          ],
+          "backgroundColor": { "red": 250, "green": 246, "blue": 239, "alpha": 1 },
+          "height": 280
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.rudy.mobile"
+      "bundleIdentifier": "app.rudy.mobile",
+      "infoPlist": {
+        "RCTAsyncStorageAppGroup": "group.app.rudy.mobile"
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.app.rudy.mobile"]
+      }
     },
     "android": {
       "package": "app.rudy.mobile",

@@ -2,6 +2,7 @@ import { getCalendars } from 'expo-localization';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, loadToken, setToken, type User } from './api';
 import { currentLocale, setAppLocale } from './i18n';
+import { registerPushToken } from './push';
 
 type Stage = 'loading' | 'signedOut' | 'needsOnboarding' | 'ready';
 
@@ -9,6 +10,7 @@ interface Session {
   stage: Stage;
   user: User | null;
   signIn: (email: string) => Promise<void>;
+  signInWithApple: (identityToken: string, displayName?: string) => Promise<void>;
   completeOnboarding: () => void;
   refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -36,6 +38,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await setAppLocale(me.locale);
       const { items } = await api.getInterests();
       setStage(items.length > 0 ? 'ready' : 'needsOnboarding');
+      void registerPushToken(); // 앱 실행 시 토큰 동기화 (H8 복구 경로)
     } catch {
       // 토큰 만료 등 — 로그인부터 다시.
       await setToken(null);
@@ -47,13 +50,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void bootstrap();
   }, [bootstrap]);
 
-  const signIn = useCallback(async (email: string) => {
-    const { token, user: me } = await api.devLogin(email, deviceTimezone(), currentLocale());
+  const finishSignIn = useCallback(async (token: string, me: User) => {
     await setToken(token);
     setUser(me);
     const { items } = await api.getInterests();
     setStage(items.length > 0 ? 'ready' : 'needsOnboarding');
+    void registerPushToken();
   }, []);
+
+  const signIn = useCallback(
+    async (email: string) => {
+      const { token, user: me } = await api.devLogin(email, deviceTimezone(), currentLocale());
+      await finishSignIn(token, me);
+    },
+    [finishSignIn],
+  );
+
+  const signInWithApple = useCallback(
+    async (identityToken: string, displayName?: string) => {
+      const { token, user: me } = await api.appleLogin(identityToken, displayName, deviceTimezone(), currentLocale());
+      await finishSignIn(token, me);
+    },
+    [finishSignIn],
+  );
 
   const completeOnboarding = useCallback(() => setStage('ready'), []);
 
@@ -70,8 +89,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ stage, user, signIn, completeOnboarding, refreshUser, signOut }),
-    [stage, user, signIn, completeOnboarding, refreshUser, signOut],
+    () => ({ stage, user, signIn, signInWithApple, completeOnboarding, refreshUser, signOut }),
+    [stage, user, signIn, signInWithApple, completeOnboarding, refreshUser, signOut],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

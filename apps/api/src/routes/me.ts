@@ -1,9 +1,39 @@
-import { OnboardingBodySchema, UpdateMeBodySchema } from '@rudy/shared';
-import { interests, users } from '@rudy/db';
-import { eq } from 'drizzle-orm';
+import { OnboardingBodySchema, UpdateMeBodySchema, pushDelayMs, pushJobId } from '@rudy/shared';
+import { dailyBriefs, interests, users } from '@rudy/db';
+import { and, eq } from 'drizzle-orm';
+import { DateTime } from 'luxon';
 import type { AppType } from '../lib/appType';
 import { toUserDto } from '../lib/dto';
 import { notFound, serviceUnavailable } from '../lib/errors';
+
+type UserRow = typeof users.$inferSelect;
+
+/**
+ * notify_time/timezone 변경 시 오늘의 delayed push job 재등록 (PLAN #3).
+ * 오늘 brief가 있고 새 발송 시각이 아직 안 지났을 때만 다시 건다.
+ */
+async function reschedulePush(app: AppType, user: UserRow): Promise<void> {
+  const local = DateTime.now().setZone(user.timezone || 'UTC');
+  const briefDate = local.toISODate();
+  if (!briefDate) return;
+  const jobId = pushJobId(user.id, briefDate);
+  await app.pushQueue.remove(jobId).catch(() => undefined);
+
+  if (!user.expoPushToken) return;
+  const brief = await app.db
+    .select({ id: dailyBriefs.id })
+    .from(dailyBriefs)
+    .where(and(eq(dailyBriefs.userId, user.id), eq(dailyBriefs.briefDate, briefDate)))
+    .limit(1);
+  if (!brief[0]) return;
+  const delay = pushDelayMs(new Date(), briefDate, user.notifyTime, user.timezone);
+  if (delay === null || delay === 0) return; // 이미 지난 시각으로 바꾼 경우 오늘은 발송 안 함
+  await app.pushQueue.add(
+    'send',
+    { userId: user.id, briefDate },
+    { jobId, delay, attempts: 3, backoff: { type: 'exponential', delay: 5000 }, removeOnComplete: true, removeOnFail: 100 },
+  );
+}
 
 export function registerMeRoutes(app: AppType): void {
   const auth = { preHandler: app.authenticate };
@@ -23,6 +53,9 @@ export function registerMeRoutes(app: AppType): void {
     }
     const updated = await app.db.update(users).set(patch).where(eq(users.id, req.userId)).returning();
     if (!updated[0]) throw notFound('User not found');
+    if (b.notify_time !== undefined || b.timezone !== undefined) {
+      await reschedulePush(app, updated[0]).catch((err) => req.log.warn(err, 'push reschedule failed'));
+    }
     return toUserDto(updated[0]);
   });
 
