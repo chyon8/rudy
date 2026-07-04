@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Rudy",
+    "slug": "rudy",
+    "scheme": "rudy",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router",
+      "expo-localization",
+      "expo-font"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.rudy.mobile"
+    },
+    "android": {
+      "package": "app.rudy.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#faf6ef",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    }
+  }
+}

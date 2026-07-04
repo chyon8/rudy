@@ -40,6 +40,12 @@ export function registerMeRoutes(app: AppType): void {
       status: 'stable' as const,
     }));
     const created = await app.db.insert(interests).values(values).returning();
+    // 프리셋 key만 저장 — coldstart discovery 매칭에 쓴다 (자유 입력은 미매칭 허용, H4).
+    const keys = req.body.interests.map((i) => i.key).filter((k): k is string => Boolean(k));
+    await app.db
+      .update(users)
+      .set({ onboardingInterests: keys, updatedAt: new Date() })
+      .where(eq(users.id, req.userId));
     return { interests: created.map((c) => ({ id: c.id, name: c.name })) };
   });
 

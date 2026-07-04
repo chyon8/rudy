@@ -32,6 +32,8 @@ export const users = pgTable(
     timezone: text('timezone').notNull().default('UTC'),
     expoPushToken: text('expo_push_token'),
     hideNotificationContent: boolean('hide_notification_content').notNull().default(false),
+    // 온보딩 프리셋 관심사 key — coldstart discovery 매칭에 사용 (자유 입력은 미포함).
+    onboardingInterests: text('onboarding_interests').array().notNull().default(sql`'{}'`),
     createdAt,
     updatedAt,
     deletedAt: timestamp('deleted_at', { withTimezone: true }),

@@ -12,6 +12,15 @@ const TRACKING_PARAM_PATTERNS: RegExp[] = [
   /^spm$/i,
 ];
 
+/** YouTube video id 추출 — 딥링크 변환(briefs)과 정규화가 공유. 아니면 null. */
+export function extractYouTubeVideoId(input: string): string | null {
+  try {
+    return extractYouTubeId(new URL(input.trim()));
+  } catch {
+    return null;
+  }
+}
+
 function extractYouTubeId(url: URL): string | null {
   const host = url.hostname.replace(/^www\./, '');
   if (host === 'youtu.be') {

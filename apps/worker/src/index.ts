@@ -1,8 +1,9 @@
 import { createOpenAiAdapters } from '@rudy/ai';
 import { createDb } from '@rudy/db';
-import { QUEUE_INGEST, loadEnv } from '@rudy/shared';
-import { Worker } from 'bullmq';
+import { QUEUE_BRIEF, QUEUE_INGEST, loadEnv } from '@rudy/shared';
+import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
+import { runBriefTick } from './brief/scheduler';
 import { ingestMemory, markDegraded } from './ingest/pipeline';
 
 const env = loadEnv();
@@ -36,6 +37,26 @@ worker.on('failed', async (job, err) => {
   if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
     await markDegraded(db, job.data.memoryId).catch((e) => console.error('[worker] markDegraded failed', e));
   }
+});
+
+// Brief 스케줄러 — 15분 repeatable tick (docs/spec.md §4).
+const briefQueue = new Queue(QUEUE_BRIEF, { connection });
+await briefQueue.upsertJobScheduler('brief-tick', { every: 15 * 60 * 1000 }, { name: 'tick' });
+
+const briefWorker = new Worker(
+  QUEUE_BRIEF,
+  async () => {
+    await runBriefTick({ db, llm });
+  },
+  { connection, concurrency: 1 },
+);
+
+briefWorker.on('ready', () => {
+  console.log(`[worker] brief scheduler ready — 15m tick on queue "${QUEUE_BRIEF}"`);
+});
+
+briefWorker.on('failed', (_job, err) => {
+  console.error('[worker] brief tick failed:', err.message);
 });
 
 console.log('[worker] starting…');

@@ -9,6 +9,7 @@ import IORedis from 'ioredis';
 import { AppError, unauthorized } from './lib/errors';
 import { verifyToken } from './lib/jwt';
 import { registerAuthRoutes } from './routes/auth';
+import { registerBriefRoutes } from './routes/briefs';
 import { registerInterestRoutes } from './routes/interests';
 import { registerMeRoutes } from './routes/me';
 import { registerMemoryRoutes } from './routes/memories';
@@ -66,6 +67,7 @@ export async function buildApp(env: Env = loadEnv()): Promise<AppType> {
   registerMemoryRoutes(app);
   registerMeRoutes(app);
   registerInterestRoutes(app);
+  registerBriefRoutes(app);
 
   return app;
 }

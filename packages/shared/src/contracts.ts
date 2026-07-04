@@ -64,6 +64,7 @@ export const UpdateMeBodySchema = z.object({
 
 export const FeedbackBodySchema = z.object({ action: FeedbackActionSchema });
 
+export type Locale = z.infer<typeof LocaleSchema>;
 export type AuthDevBody = z.infer<typeof AuthDevBodySchema>;
 export type CreateMemoryBody = z.infer<typeof CreateMemoryBodySchema>;
 export type UpdateMemoryBody = z.infer<typeof UpdateMemoryBodySchema>;
