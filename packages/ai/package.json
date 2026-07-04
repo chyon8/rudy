@@ -1,0 +1,17 @@
+{
+  "name": "@rudy/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@rudy/shared": "workspace:*",
+    "openai": "^4.77.0",
+    "zod": "^3.24.1"
+  }
+}
