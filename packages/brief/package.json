@@ -1,0 +1,22 @@
+{
+  "name": "@rudy/brief",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@rudy/ai": "workspace:*",
+    "@rudy/db": "workspace:*",
+    "@rudy/shared": "workspace:*",
+    "drizzle-orm": "^0.38.3",
+    "luxon": "^3.7.2"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.7.2"
+  }
+}

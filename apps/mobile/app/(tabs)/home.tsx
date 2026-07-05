@@ -50,6 +50,13 @@ function metaLine(card: BriefCard, t: TFunction): string | null {
 /** 카드 시각 포맷 — 콘텐츠 종류를 규칙으로 판별 (DESIGN.md card variants). */
 type CardKind = 'video' | 'thought' | 'article' | 'discovery' | 'reflection';
 
+/** 카드 위 '왜 이걸 보여주는지' 라벨 — reason_code 기반 (Rediscovered/Connected/…). */
+function labelKey(card: BriefCard): string {
+  if (card.card_type === 'discovery') return 'home.discoveryLabel';
+  if (card.card_type === 'reflection') return 'home.reflectionLabel';
+  return `home.label_${card.reason_code}`;
+}
+
 function kindOf(card: BriefCard): CardKind {
   if (card.card_type === 'discovery') return 'discovery';
   if (card.card_type === 'reflection') return 'reflection';
@@ -262,12 +269,12 @@ export default function Home() {
               <View style={{ position: 'absolute', top: -60, right: -40 }}>
                 <Orb color={orbColorByCardType[hero.card_type] ?? colors.gradientLavender} />
               </View>
-              {kind === 'discovery' && (
-                <Text style={[typo.captionUppercase, { marginBottom: spacing.xs }]}>
-                  {t('home.discoveryLabel')}
-                  {hero.external_content?.source ? ` · ${hero.external_content.source}` : ''}
-                </Text>
-              )}
+              <Text style={[typo.captionUppercase, { marginBottom: spacing.xs }]}>
+                {t(labelKey(hero))}
+                {kind === 'discovery' && hero.external_content?.source
+                  ? ` · ${hero.external_content.source}`
+                  : ''}
+              </Text>
               {kind === 'thought' ? (
                 <>
                   <Text style={typo.displayMd}>“{hero.memory?.raw_text ?? title}”</Text>
@@ -327,9 +334,19 @@ export default function Home() {
               </Text>
             ) : null;
 
+            const label = (
+              <Text style={[typo.captionUppercase, { marginBottom: spacing.xs }]}>
+                {t(labelKey(card))}
+                {kind === 'discovery' && card.external_content?.source
+                  ? ` · ${card.external_content.source}`
+                  : ''}
+              </Text>
+            );
+
             if (kind === 'thought') {
               return (
                 <Pressable key={card.id} onPress={() => openCard(card)} style={base}>
+                  {label}
                   <Text style={[typo.displayMd, { fontSize: 18, lineHeight: 26 }]} numberOfLines={4}>
                     “{card.memory?.raw_text ?? title}”
                   </Text>
@@ -343,6 +360,7 @@ export default function Home() {
             if (kind === 'video') {
               return (
                 <Pressable key={card.id} onPress={() => openCard(card)} style={base}>
+                  {label}
                   {thumb && (
                     <View style={{ marginBottom: spacing.sm }}>
                       <Image
@@ -370,17 +388,7 @@ export default function Home() {
             // article / discovery / reflection — 가로형. 썸네일 없으면 도메인 이니셜 타일.
             return (
               <Pressable key={card.id} onPress={() => openCard(card)} style={base}>
-                {kind === 'discovery' && (
-                  <Text style={[typo.captionUppercase, { marginBottom: spacing.xs }]}>
-                    {t('home.discoveryLabel')}
-                    {card.external_content?.source ? ` · ${card.external_content.source}` : ''}
-                  </Text>
-                )}
-                {kind === 'reflection' && (
-                  <Text style={[typo.captionUppercase, { marginBottom: spacing.xs }]}>
-                    {t('home.reflectionLabel')}
-                  </Text>
-                )}
+                {label}
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                   {thumb ? (
                     <Image source={{ uri: thumb }} style={{ width: 64, height: 64, borderRadius: rounded.sm }} />

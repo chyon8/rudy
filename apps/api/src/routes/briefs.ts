@@ -15,6 +15,7 @@ import {
   pickFallbackCards,
   type Locale,
 } from '@rudy/shared';
+import { generateBriefForUser } from '@rudy/brief';
 import type { InferSelectModel } from 'drizzle-orm';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
@@ -39,7 +40,17 @@ export function registerBriefRoutes(app: AppType): void {
 
     let brief = await findBrief(app.db, user.id, briefDate);
     if (!brief) {
-      await createSyncBrief(app.db, user, briefDate);
+      // 뇌 통합: 동기 경로도 정식 엔진으로 생성한다 (LLM 없음·링크검증 생략 = 빠르고 결정적).
+      // 후보 0건(새 사용자)이거나 엔진이 실패할 때만 coldstart/fallback 즉석 조립.
+      let result: string = 'no_candidates';
+      try {
+        result = await generateBriefForUser({ db: app.db, llm: null }, user, briefDate, local, undefined, {
+          checkLinks: false,
+        });
+      } catch (err) {
+        req.log.error({ err }, 'sync brief engine failed — falling back');
+      }
+      if (result === 'no_candidates') await createSyncBrief(app.db, user, briefDate);
       // ON CONFLICT DO NOTHING 후 재조회 — 동시 요청 경합 안전 (PLAN #2).
       brief = await findBrief(app.db, user.id, briefDate);
     }

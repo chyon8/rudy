@@ -47,6 +47,9 @@ importers:
       '@rudy/ai':
         specifier: workspace:*
         version: link:../../packages/ai
+      '@rudy/brief':
+        specifier: workspace:*
+        version: link:../../packages/brief
       '@rudy/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -175,6 +178,9 @@ importers:
       '@rudy/ai':
         specifier: workspace:*
         version: link:../../packages/ai
+      '@rudy/brief':
+        specifier: workspace:*
+        version: link:../../packages/brief
       '@rudy/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -215,6 +221,28 @@ importers:
       zod:
         specifier: ^3.24.1
         version: 3.25.76
+
+  packages/brief:
+    dependencies:
+      '@rudy/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@rudy/db':
+        specifier: workspace:*
+        version: link:../db
+      '@rudy/shared':
+        specifier: workspace:*
+        version: link:../shared
+      drizzle-orm:
+        specifier: ^0.38.3
+        version: 0.38.4(@types/react@19.2.17)(postgres@3.4.9)(react@19.2.3)
+      luxon:
+        specifier: ^3.7.2
+        version: 3.7.2
+    devDependencies:
+      '@types/luxon':
+        specifier: ^3.7.2
+        version: 3.7.2
 
   packages/db:
     dependencies:

@@ -100,8 +100,22 @@ export async function setToken(next: string | null): Promise<void> {
   else await AsyncStorage.removeItem(TOKEN_KEY);
 }
 
+/** 10초 안에 응답 없으면 중단하고 어떤 주소로 갔는지 담아 던진다 — 조용한 무한 대기 방지. */
+async function fetchWithTimeout(url: string, init: RequestInit, ms = 10000): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } catch (err) {
+    const reason = err instanceof Error && err.name === 'AbortError' ? 'timed out' : 'could not connect';
+    throw new ApiError('network', 0, `${reason} — ${url}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function request<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetchWithTimeout(`${BASE_URL}${path}`, {
     method: init.method ?? 'GET',
     headers: {
       'content-type': 'application/json',

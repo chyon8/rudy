@@ -192,17 +192,21 @@ score = 0.35*interest_alignment   // memory↔rising/stable interest 최대 cosi
 - **링크 검증(#6)**: 최종 선정 카드 3~5장만. HEAD → 실패 시 GET+Range:bytes=0-0 폴백, timeout 3s.
   4xx(405 제외)/네트워크 오류만 dead → link_alive=false + 차순위 교체 후 재검증. (safeFetch 경유)
 
-### 4.4 문구 생성 (LLM 1회 호출)
-- 선택 카드 전체 + greeting/closing 단일 프롬프트 배치 생성, JSON 출력. 언어 = user.locale.
-- 입력: 카드별 {title, summary, user_note, reason_code, 경과일}, 오늘 날짜/요일, 사용자 이름.
-- **§11 톤 가이드(locale별) 시스템 프롬프트 포함.** 금지어 필터 실패 → 1회 재생성 → 또 실패 시 reason_code별 템플릿.
+### 4.4 문구 생성 — 결정적 뼈대 + hero만 LLM
+- **모든 카드의 curation_reason은 결정적**: 스코어링이 계산한 reason_code + 사실(경과일, 관심사 이름)로
+  tone config의 `reasonFor` 템플릿이 만든다. LLM이 이유를 "창작"하지 않는다 — 근거는 이미 계산돼 있다.
+- **LLM은 hero 1장만**: hero reason + greeting/closing을 1회 호출로 업그레이드 (worker 경로만).
+  금지어 필터 실패 → 1회 재생성 → 또 실패 시 템플릿. llm=null(동기 GET 경로)이면 완전 결정적.
+- **서사 greeting**: 선정 카드 중 같은 interest가 ≥2장이면 `narrativeGreeting(관심사명)` +
+  해당 카드들을 hero 다음에 묶는다. 지배적 관심사가 없는 날은 서사를 만들지 않는다 (억지 테마 금지).
+- 클라이언트는 reason_code를 카드 상단 라벨로 렌더 (다시 발견/이어진 기억/요즘 관심/…).
 
-### 4.5 Fallback vs Coldstart (분리된 경로 — 둘 다 카드 ≥ 3장, status='fallback')
-- **Coldstart** (memory < 15 && 오늘 brief 없음): 최근 memory 최대 3장(reason_code='cold_start')
-  + 온보딩 관심사 매칭 discovery 2장. memory 0건이면 discovery 3장.
-- **Fallback** (생성 실패 시): 최근 memory 3건(시간 역순) + 템플릿 greeting. 3건 미만이면 discovery로 보충.
-- 둘 다 **status='fallback'으로 저장** — 배치의 정식 엔진이 이후 승격할 수 있어야 한다.
-  (coldstart를 'generated'로 저장하면 하루 종일 앙상한 브리핑에 갇힌다 — 결함 수정됨.)
+### 4.5 동기 생성 (GET /briefs/today, brief 없을 때) — 뇌는 하나다
+- **1순위: 정식 엔진** (`@rudy/brief` — API·worker가 같은 패키지를 쓴다). 동기 경로는
+  llm=null(문구는 결정적 템플릿)·checkLinks=false(죽은 링크는 다음 배치가 잡음)로 돌려
+  수백 ms 안에 배치와 같은 품질(3~5장, 스코어링·구성 동일)을 낸다. status='generated'.
+- **2순위 (후보 0건·엔진 실패 시)**: coldstart(memory<15: 최근 3장 + discovery 2장, 0건이면 discovery 3장)
+  / fallback(최근 3건 + discovery 보충). 둘 다 status='fallback' — 배치가 이후 승격 가능.
 - 동시성: `INSERT ... ON CONFLICT DO NOTHING` 후 재조회.
 - **승격 규칙**: 배치는 status='fallback'이고 **카드 피드백(impression 포함) 0건**인 brief만 교체 가능. (#2)
 
@@ -271,8 +275,10 @@ APPLE_CLIENT_ID, GOOGLE_CLIENT_ID, EXPO_ACCESS_TOKEN
 
 ## 9. Copy & Tone Guide
 
-- 담백하고 따뜻한 존댓말/정중한 영어. 이모지 금지. 느낌표 최대 1개.
+- ko: 담백하고 친근한 **반말(해체)** / en: plain, warm English. 이모지 금지. 느낌표 최대 1개.
+- **주어는 사용자다**: 콘텐츠를 요약·설명하지 않고, 사용자와 그것의 관계(시간·행동·관심)를 말한다.
+  ("저장한 지 21일" O / "이 글은 ~에 대한 논의입니다" X)
 - 과거 저장물은 항상 자산/선물 프레임: "그때 남겨둔", "지금 보면 좋을 타이밍".
-- 제안형 어미: "~어때요?", "~해도 좋겠어요" / en 대응.
+- 제안형 어미: "~볼까", "~좋겠어" / en 대응. 명령·재촉 금지.
 - 금지어(ko): "아직", "안 봤", "밀려", "잊고", "벌써", "이번엔 꼭", "N일째", "쌓여". en은 §6 목록.
 - curation_reason: 1~2문장, en 120자 / ko 60자 이내.

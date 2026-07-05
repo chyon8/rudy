@@ -39,6 +39,33 @@ export const toneEn: ToneGuide = {
       'This one has been sitting quietly since you saved it.',
       'A recent save — see if it still sparks something.',
     ],
+    // 주어는 항상 '너' — 콘텐츠 설명 금지, 너와 그것의 관계만 말한다.
+    reasonFor: (code, f) => {
+      const d = Math.max(1, Math.floor(f.ageDays));
+      switch (code) {
+        case 'maturity':
+          return `You saved this ${d} days ago. It might read differently now.`;
+        case 'connection':
+          return `This ties into other things you've been saving.`;
+        case 'rising_interest':
+          return f.interestName
+            ? `You've been leaning into ${f.interestName} lately — this fits right in.`
+            : `You've been circling this topic lately.`;
+        case 'timing':
+          return d <= 1
+            ? 'You saved this just now — a good moment to actually take it in.'
+            : `Saved ${d} days ago. Today feels like the right moment.`;
+        case 'surprise':
+          // 경과일을 섞어 같은 문장 반복을 피한다.
+          return d > 1
+            ? `A little off your usual path — you left this ${d} days ago.`
+            : 'A little off your usual path — on purpose.';
+        case 'cold_start':
+          return "You saved this recently — here's how Rudy read it.";
+      }
+    },
+    narrativeGreeting: (interestName) => `A lot of ${interestName} in your world today.`,
+    discoveryReason: 'Found near your interests — something you did not save.',
     coldstartDiscoveryReason: (interestLabel) => `Picked for your interest in ${interestLabel}.`,
     pushPreview: (heroTitle) => `Your morning brief is ready — starting with "${heroTitle}".`,
     pushHidden: 'Your Home for today is ready.',

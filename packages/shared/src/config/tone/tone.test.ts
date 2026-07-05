@@ -50,6 +50,18 @@ describe('템플릿 자체 검증', () => {
       for (const r of tone.templates.fallbackReasons) {
         expect(isValidReason(r, locale)).toBe(true);
       }
+      // 결정적 reason 빌더 — 모든 코드 × 대표 사실 조합이 자기 필터를 통과해야 한다.
+      for (const code of ['timing', 'rising_interest', 'maturity', 'connection', 'surprise', 'cold_start'] as const) {
+        for (const facts of [
+          { ageDays: 0.5 },
+          { ageDays: 21 },
+          { ageDays: 180, interestName: locale === 'ko' ? '러닝' : 'running' },
+        ]) {
+          expect(isValidReason(tone.templates.reasonFor(code, facts), locale)).toBe(true);
+        }
+      }
+      expect(isValidReason(tone.templates.discoveryReason, locale)).toBe(true);
+      expect(findToneViolation(tone.templates.narrativeGreeting(locale === 'ko' ? '러닝' : 'running'), locale)).toBeNull();
       expect(isValidReason(tone.templates.coldstartDiscoveryReason('Cooking'), locale)).toBe(true);
       for (const reason of Object.values(tone.templates.reasons)) {
         expect(isValidReason(reason, locale)).toBe(true);

@@ -3,8 +3,15 @@ import { pushDelayMs, pushJobId, type PushJobData } from '@rudy/shared';
 import type { Queue } from 'bullmq';
 import { and, count, eq, isNull } from 'drizzle-orm';
 import { DateTime } from 'luxon';
-import { createFallbackBrief, generateBriefForUser, type BriefDeps, type UserRow } from './generate';
-import { canPromote, isInGenerationWindow, timeToMinutes } from './window';
+import {
+  canPromote,
+  createFallbackBrief,
+  generateBriefForUser,
+  isInGenerationWindow,
+  timeToMinutes,
+  type BriefDeps,
+  type UserRow,
+} from '@rudy/brief';
 
 export interface TickDeps extends BriefDeps {
   pushQueue: Queue<PushJobData>;

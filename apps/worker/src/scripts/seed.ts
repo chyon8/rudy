@@ -10,7 +10,7 @@ import { createDb, dailyBriefs, memories, users } from '@rudy/db';
 import { createStorage, loadEnv, normalizeUrl } from '@rudy/shared';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { DateTime } from 'luxon';
-import { generateBriefForUser } from '../brief/generate';
+import { generateBriefForUser } from '@rudy/brief';
 import { ingestMemory } from '../ingest/pipeline';
 import { runInterestEngineForUser } from '../interest/engine';
 
@@ -77,10 +77,18 @@ async function main() {
   }
   console.log(`[seed] user: ${user.authId} (${user.locale}, ${user.timezone})`);
 
-  // 1. 백데이트 저장물 주입 (이미 같은 URL이 있으면 스킵 — 재실행 안전).
+  // 1. 백데이트 저장물 주입 (재실행 안전 — 링크는 URL 유니크, thought는 본문 일치로 스킵).
   const inserted: string[] = [];
   for (const item of SEEDS) {
     const createdAt = new Date(Date.now() - item.daysAgo * 24 * 60 * 60 * 1000);
+    if (item.text) {
+      const dupe = await db
+        .select({ id: memories.id })
+        .from(memories)
+        .where(and(eq(memories.userId, user.id), eq(memories.rawText, item.text), isNull(memories.deletedAt)))
+        .limit(1);
+      if (dupe[0]) continue;
+    }
     const rows = await db
       .insert(memories)
       .values({

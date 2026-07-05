@@ -200,6 +200,8 @@ hairlines; the only depth signal is the Hero card's single atmospheric orb.
 - **`card-support-discovery`** — article layout topped with `{typography.caption-uppercase}` label "Something new · {source}". The only card that names its own kind, because it is not the user's memory.
 - **`card-support-reflection`** — no thumbnail; `{typography.caption-uppercase}` label "Lately you" + interest name as title + curation_reason.
 
+**`card-why-label`** — Every Home card opens with one `{typography.caption-uppercase}` line stating WHY it is here today, mapped from reason_code: "Rediscovered" (maturity) / "Connected" (connection) / "On your mind" (rising_interest) / "Good timing" (timing) / "A curveball" (surprise) / "Just saved" (cold_start) / "Something new · {source}" (discovery) / "Lately you" (reflection). This single line is what separates Rudy from a recommendation feed — never omit it.
+
 **`play-badge`** — 40×40 circle, `rgba(28,23,18,0.72)` on top of a video thumbnail, centered, white Feather `play` icon 16px. Video cards only (hero and support).
 
 **`domain-tile`** — 64×64 (`{rounded.sm}`) `{colors.surface-strong}` tile with the domain's first letter in `{typography.display-md}` — thumbnail fallback for link cards so no card renders bare text-only by accident.

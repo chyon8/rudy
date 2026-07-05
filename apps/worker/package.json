@@ -13,6 +13,7 @@
   "dependencies": {
     "@mozilla/readability": "^0.5.0",
     "@rudy/ai": "workspace:*",
+    "@rudy/brief": "workspace:*",
     "@rudy/db": "workspace:*",
     "@rudy/shared": "workspace:*",
     "bullmq": "^5.34.0",
